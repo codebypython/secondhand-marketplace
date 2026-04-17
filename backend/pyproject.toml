@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "secondhand-marketplace-backend"
+version = "0.1.0"
+description = "FastAPI backend for a social secondhand marketplace"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "alembic",
+  "email-validator",
+  "fastapi",
+  "psycopg[binary]",
+  "pwdlib[argon2]",
+  "pydantic-settings",
+  "PyJWT",
+  "sqlalchemy",
+  "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx",
+  "pytest",
+  "pytest-asyncio",
+  "pytest-cov",
+  "ruff",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
+ignore = ["B008", "E501"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

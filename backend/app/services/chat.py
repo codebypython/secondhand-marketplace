@@ -72,11 +72,14 @@ def send_message(session: Session, user: User, payload: MessageCreate) -> Messag
     message = Message(conversation_id=conversation.id, sender_id=user.id, content=payload.content)
     session.add(message)
     session.commit()
-    return session.scalar(
+    result = session.scalar(
         select(Message)
         .where(Message.id == message.id)
         .options(selectinload(Message.sender).selectinload(User.profile))
     )
+    if not result:
+        raise ValueError("Failed to retrieve message after creation")
+    return result
 
 
 def soft_delete_message(session: Session, user: User, message_id) -> None:

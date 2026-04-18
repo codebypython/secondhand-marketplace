@@ -1,0 +1,99 @@
+﻿
+> frontend@0.1.0 build
+> next build --webpack
+
+  Skipping creating a lockfile at D:\User\Workspace\secondhand-marketplace\frontend\.next\lock because we're using WASM bindings
+Γû▓ Next.js 16.1.6 (webpack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+node.exe : Failed to compile.
+At line:1 char:1
++ & "C:\Program Files (x86)\nodejs/node.exe" "C:\Program Files (x86)\no ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Failed to compile.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+./src/app/users/[userId]/page.tsx
+Error:   x Not a pattern
+     ,-[D:\User\Workspace\secondhand-marketplace\frontend\src\app\users\[userId]\page.tsx:183:1]
+ 180 |               </div>
+ 181 |     
+ 182 |               {activeTab === "listings" ? (
+ 183 | ,->             listings.length === 0 ? (
+ 184 | |               <div className="empty-state panel">
+ 185 | |                 <div className="empty-icon">≡ƒôª</div>
+ 186 | |                 <h3>Ch╞░a c├│ tin ─æ─âng n├áo</h3>
+ 187 | |                 <p>Ng╞░ß╗¥i d├╣ng n├áy ch╞░a ─æ─âng b├ín sß║ún phß║⌐m n├áo.</p>
+ 188 | |               </div>
+ 189 | |             ) : (
+ 190 | |               <div className="grid two" style={{ gridTemplateColumns: "repeat(2, 1fr)" }}>
+ 191 | |                 {listings.map((listing) => {
+ 192 | |                   const statusCls = listing.status === "AVAILABLE" ? "badge-success" : listing.status === 
+"SOLD" ? "badge-danger" : "badge-warning";
+ 193 | |                   return (
+ 194 | |                     <article className="card" key={listing.id}>
+ 195 | |                       <div className="inline">
+ 196 | |                         <span className={`badge ${statusCls}`}>{statusLabels[listing.status] ?? 
+listing.status}</span>
+ 197 | |                         <span className="badge">{conditionLabels[listing.condition] ?? 
+listing.condition}</span>
+ 198 | |                       </div>
+ 199 | |                       <h3 className="truncate">{listing.title}</h3>
+ 200 | |                       <p className="muted truncate" style={{ fontSize: 13 }}>{listing.description ?? "Kh├┤ng 
+c├│ m├┤ tß║ú"}</p>
+ 201 | |                       <div className="price-sm">{formatPrice(listing.price)} Γé½</div>
+ 202 | |                       <div className="muted" style={{ fontSize: 12 }}>{timeAgo(listing.created_at)}</div>
+ 203 | |                       <div className="card-actions">
+ 204 | |                         <Link className="button secondary sm" href={`/listings/${listing.id}`}>
+ 205 | |                           Xem chi tiß║┐t ΓåÆ
+ 206 | |                         </Link>
+ 207 | |                       </div>
+ 208 | |                     </article>
+ 209 | |                   );
+ 210 | |                 })}
+ 211 | |               </div>
+ 212 | `->           ) : (
+ 213 |                 reviews.length === 0 ? (
+ 214 |                   <div className="empty-state panel">
+ 215 |                     <div className="empty-icon">Γ¡É</div>
+     `----
+  x Expected '</', got ':'
+     ,-[D:\User\Workspace\secondhand-marketplace\frontend\src\app\users\[userId]\page.tsx:212:1]
+ 209 |                 );
+ 210 |               })}
+ 211 |             </div>
+ 212 |           ) : (
+     :             ^
+ 213 |             reviews.length === 0 ? (
+ 214 |               <div className="empty-state panel">
+ 215 |                 <div className="empty-icon">Γ¡É</div>
+     `----
+
+Caused by:
+    0: failed to process js file
+    1: Syntax Error
+    at module.exports.__wbindgen_error_new 
+(D:\User\Workspace\secondhand-marketplace\frontend\node_modules\next\wasm\@next\swc-wasm-nodejs\wasm.js:646:17)
+    at wasm.wasm.__wbindgen_error_new externref shim (wasm://wasm/wasm.wasm-06ee55a6:wasm-function[23435]:0x154c60c)
+    at wasm.wasm.wasm::transform_sync::h8f088a3ccf85e578 (wasm://wasm/wasm.wasm-06ee55a6:wasm-function[2119]:0xb5f411)
+    at wasm.wasm.wasm_bindgen_futures::future_to_promise::{{closure}}::{{closure}}::h18078cee9cfcb338 
+(wasm://wasm/wasm.wasm-06ee55a6:wasm-function[10870]:0x134726e)
+    at wasm.wasm.wasm_bindgen_futures::queue::Queue::new::{{closure}}::h84b88d39e63d39e3 
+(wasm://wasm/wasm.wasm-06ee55a6:wasm-function[8941]:0x1270a0f)
+    at wasm.wasm.<dyn core::ops::function::FnMut<(A,)>+Output = R as 
+wasm_bindgen::closure::WasmClosure>::describe::invoke::h761ad9d919d2a140 
+(wasm://wasm/wasm.wasm-06ee55a6:wasm-function[22974]:0x154910b)
+    at wasm.wasm.closure1308 externref shim (wasm://wasm/wasm.wasm-06ee55a6:wasm-function[23953]:0x154f8dd)
+    at __wbg_adapter_50 
+(D:\User\Workspace\secondhand-marketplace\frontend\node_modules\next\wasm\@next\swc-wasm-nodejs\wasm.js:348:10)
+    at real 
+(D:\User\Workspace\secondhand-marketplace\frontend\node_modules\next\wasm\@next\swc-wasm-nodejs\wasm.js:140:20)
+    at node:internal/process/task_queues:151:7
+
+Import trace for requested module:
+./src/app/users/[userId]/page.tsx
+
+
+> Build failed because of webpack errors

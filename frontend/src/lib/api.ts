@@ -45,7 +45,7 @@ export const api = {
   me: (token: string) => request<User>("/auth/me", undefined, token),
 
   // User
-  updateProfile: (token: string, payload: { full_name?: string; avatar_url?: string; bio?: string }) =>
+  updateProfile: (token: string, payload: { full_name?: string; avatar_url?: string; bio?: string; display_name?: string; phone?: string; address?: string; dob?: string; shop_slug?: string; banner_url?: string; }) =>
     request<User>("/users/me", { method: "PATCH", body: JSON.stringify(payload) }, token),
   getUser: (userId: string) => request<UserPublic>(`/users/${userId}`),
   getUserListings: (userId: string) => request<Listing[]>(`/users/${userId}/listings`),
@@ -63,6 +63,10 @@ export const api = {
     request<Listing>(`/listings/${listingId}`, { method: "PATCH", body: JSON.stringify(payload) }, token),
   deleteListing: (token: string, listingId: string) =>
     request<void>(`/listings/${listingId}`, { method: "DELETE" }, token),
+  restoreListing: (token: string, listingId: string) =>
+    request<Listing>(`/listings/${listingId}/restore`, { method: "POST" }, token),
+  getDeletedListings: (token: string) => 
+    request<Listing[]>("/listings/me/deleted", undefined, token),
   toggleFavorite: (token: string, listingId: string) =>
     request<{ favorite: boolean }>(`/listings/${listingId}/favorite`, { method: "POST" }, token),
 
@@ -77,13 +81,21 @@ export const api = {
     request<Offer>(`/transactions/offers/${offerId}/decline`, { method: "POST" }, token),
   cancelOffer: (token: string, offerId: string) =>
     request<Offer>(`/transactions/offers/${offerId}/cancel`, { method: "POST" }, token),
+  counterOffer: (token: string, offerId: string, payload: { price: number }) =>
+    request<Offer>(`/transactions/offers/${offerId}/counter`, { method: "POST", body: JSON.stringify(payload) }, token),
   listDeals: (token: string) => request<Deal[]>("/transactions/deals", undefined, token),
   completeDeal: (token: string, dealId: string) =>
     request<Deal>(`/transactions/deals/${dealId}/complete`, { method: "POST" }, token),
   cancelDeal: (token: string, dealId: string) =>
     request<Deal>(`/transactions/deals/${dealId}/cancel`, { method: "POST" }, token),
-  scheduleMeetup: (token: string, payload: { deal_id: string; scheduled_at: string; location?: Record<string, unknown> }) =>
+  updateDelivery: (token: string, dealId: string, payload: { delivery_status: string; tracking_code?: string | null }) =>
+    request<Deal>(`/transactions/deals/${dealId}/delivery`, { method: "PATCH", body: JSON.stringify(payload) }, token),
+  fileDispute: (token: string, dealId: string, payload: { reason: string }) =>
+    request<Deal>(`/transactions/deals/${dealId}/dispute`, { method: "POST", body: JSON.stringify(payload) }, token),
+  scheduleMeetup: (token: string, payload: { deal_id: string; scheduled_at: string; location?: Record<string, unknown> | null }) =>
     request<Meetup>("/transactions/meetups", { method: "POST", body: JSON.stringify(payload) }, token),
+  checkInMeetup: (token: string, meetupId: string) =>
+    request<Meetup>(`/transactions/meetups/${meetupId}/check-in`, { method: "POST" }, token),
 
   // Chat
   createConversation: (token: string, payload: { participant_ids: string[]; listing_id?: string; title?: string }) =>

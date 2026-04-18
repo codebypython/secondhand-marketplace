@@ -9,7 +9,7 @@ from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import DealStatus, MeetupStatus, OfferStatus
+from app.models.enums import DealStatus, DeliveryStatus, MeetupStatus, OfferStatus
 from app.models.mixins import JSONBSqlType, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
@@ -37,6 +37,14 @@ class Offer(Base, UUIDMixin, TimestampMixin):
         default=OfferStatus.PENDING,
         nullable=False,
     )
+    parent_offer_id: Mapped[str | None] = mapped_column(
+        ForeignKey("offers.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    is_counter_from_seller: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
+    expires_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+    parent_offer: Mapped[Offer | None] = relationship(remote_side="Offer.id")
 
     listing: Mapped[Listing] = relationship(back_populates="offers")
     buyer: Mapped[User] = relationship(back_populates="offers", foreign_keys=[buyer_id])
@@ -92,6 +100,14 @@ class Deal(Base, UUIDMixin, TimestampMixin):
         default=DealStatus.OPEN,
         nullable=False,
     )
+    delivery_status: Mapped[DeliveryStatus] = mapped_column(
+        SAEnum(DeliveryStatus, name="delivery_status"),
+        default=DeliveryStatus.PENDING,
+        nullable=False,
+    )
+    tracking_code: Mapped[str | None] = mapped_column(nullable=True)
+    has_dispute: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
+    dispute_reason: Mapped[str | None] = mapped_column(nullable=True)
 
     listing: Mapped[Listing] = relationship(back_populates="deals")
     buyer: Mapped[User] = relationship(foreign_keys=[buyer_id], back_populates="deals_as_buyer")
@@ -126,5 +142,7 @@ class Meetup(Base, UUIDMixin, TimestampMixin):
         default=MeetupStatus.SCHEDULED,
         nullable=False,
     )
+    buyer_checked_in: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
+    seller_checked_in: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
 
     deal: Mapped[Deal] = relationship(back_populates="meetups")

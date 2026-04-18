@@ -13,8 +13,14 @@ import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, ti
 export default function ProfilePage() {
   const { token, user, refreshUser } = useAuth();
   const [fullName, setFullName] = useState(() => user?.profile?.full_name ?? "");
+  const [displayName, setDisplayName] = useState(() => user?.profile?.display_name ?? "");
   const [avatarUrl, setAvatarUrl] = useState(() => user?.profile?.avatar_url ?? "");
+  const [bannerUrl, setBannerUrl] = useState(() => user?.profile?.banner_url ?? "");
   const [bio, setBio] = useState(() => user?.profile?.bio ?? "");
+  const [phone, setPhone] = useState(() => user?.profile?.phone ?? "");
+  const [address, setAddress] = useState(() => user?.profile?.address ?? "");
+  const [dob, setDob] = useState(() => user?.profile?.dob ?? "");
+  const [shopSlug, setShopSlug] = useState(() => user?.profile?.shop_slug ?? "");
   const [loading, setLoading] = useState(false);
   const [myListings, setMyListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
@@ -44,7 +50,17 @@ export default function ProfilePage() {
     event.preventDefault();
     setLoading(true);
     try {
-      await api.updateProfile(token, { full_name: fullName, avatar_url: avatarUrl || undefined, bio: bio || undefined });
+      await api.updateProfile(token, { 
+        full_name: fullName, 
+        display_name: displayName || undefined,
+        avatar_url: avatarUrl || undefined, 
+        banner_url: bannerUrl || undefined,
+        bio: bio || undefined,
+        phone: phone || undefined,
+        address: address || undefined,
+        dob: dob || undefined,
+        shop_slug: shopSlug || undefined
+      });
       await refreshUser();
       showToast("Cập nhật hồ sơ thành công!", "success");
     } catch (err) {
@@ -95,6 +111,11 @@ export default function ProfilePage() {
                 <span className="badge badge-info">{soldListings.length}</span>
               </div>
             </div>
+            
+            <div className="divider" style={{ width: "100%", margin: "8px 0" }} />
+            <Link href="/profile/recycle-bin" className="button ghost" style={{ width: "100%" }}>
+              🗑️ Thùng rác (Tin đã xóa)
+            </Link>
           </div>
 
           {/* Edit form */}
@@ -102,11 +123,38 @@ export default function ProfilePage() {
             <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>✏️ Chỉnh sửa hồ sơ</h2>
             <div className="field">
               <label htmlFor="fullName">Họ và tên</label>
-              <input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+              <input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />
+            </div>
+            <div className="field">
+              <label htmlFor="displayName">Tên hiển thị (Shop/Nickname)</label>
+              <input id="displayName" placeholder="Tên để người khác nhìn thấy..." value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="shopSlug">Đường dẫn trang Shop (tùy chọn)</label>
+              <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <span className="muted" style={{ fontSize: 13 }}>/shop/</span>
+                <input id="shopSlug" placeholder="nguyenvana" value={shopSlug} onChange={(e) => setShopSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))} style={{ flex: 1 }} />
+              </div>
+            </div>
+            <div className="field">
+              <label htmlFor="phone">Số điện thoại</label>
+              <input id="phone" type="tel" placeholder="0912345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="dob">Ngày sinh</label>
+              <input id="dob" type="date" value={dob} onChange={(e) => setDob(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="address">Địa chỉ</label>
+              <input id="address" placeholder="123 Đường ABC, Quận X..." value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
             <div className="field">
               <label htmlFor="avatarUrl">Avatar URL</label>
               <input id="avatarUrl" placeholder="https://example.com/avatar.jpg" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="bannerUrl">Banner Shop URL</label>
+              <input id="bannerUrl" placeholder="https://example.com/banner.jpg" value={bannerUrl} onChange={(e) => setBannerUrl(e.target.value)} />
             </div>
             <div className="field">
               <label htmlFor="bio">Giới thiệu bản thân</label>

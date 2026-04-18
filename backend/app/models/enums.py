@@ -31,6 +31,12 @@ class OfferStatus(enum.Enum):
     DECLINED = "DECLINED"
     CANCELLED = "CANCELLED"
     EXPIRED = "EXPIRED"
+    COUNTERED = "COUNTERED"
+
+class DeliveryStatus(enum.Enum):
+    PENDING = "PENDING"
+    SHIPPING = "SHIPPING"
+    DELIVERED = "DELIVERED"
 
 
 class DealStatus(enum.Enum):

@@ -11,12 +11,16 @@ from app.schemas.user import UserRead
 
 class CategoryCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+    slug: str | None = Field(default=None, max_length=255)
+    image_url: str | None = Field(default=None, max_length=1000)
     parent_id: UUID | None = None
 
 
 class CategoryRead(ORMModel):
     id: UUID
     name: str
+    slug: str | None = None
+    image_url: str | None = None
     parent_id: UUID | None = None
 
 
@@ -26,6 +30,8 @@ class ListingCreate(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     price: Decimal = Field(ge=0)
     condition: ItemCondition = ItemCondition.USED
+    brand: str | None = Field(default=None, max_length=255)
+    has_warranty: bool = False
     location_data: dict | None = None
     image_urls: list[str] = Field(default_factory=list)
 
@@ -36,6 +42,8 @@ class ListingUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=4000)
     price: Decimal | None = Field(default=None, ge=0)
     condition: ItemCondition | None = None
+    brand: str | None = Field(default=None, max_length=255)
+    has_warranty: bool | None = None
     location_data: dict | None = None
     image_urls: list[str] | None = None
     status: ListingStatus | None = None
@@ -49,6 +57,8 @@ class ListingRead(ORMModel):
     description: str | None = None
     price: Decimal
     condition: ItemCondition
+    brand: str | None = None
+    has_warranty: bool = False
     location_data: dict | None = None
     image_urls: list[str]
     status: ListingStatus

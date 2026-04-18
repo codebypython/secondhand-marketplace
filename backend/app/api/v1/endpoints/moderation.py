@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,7 +24,7 @@ def create_report_endpoint(
     payload: ReportCreate,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> ReportRead:
+) -> Any:
     try:
         return create_report(session, current_user, payload)
     except ValueError as exc:
@@ -31,7 +32,7 @@ def create_report_endpoint(
 
 
 @router.get("/reports", response_model=list[ReportRead])
-def list_reports_endpoint(session: Session = Depends(get_db_session), _admin: User = Depends(get_admin_user)) -> list[ReportRead]:
+def list_reports_endpoint(session: Session = Depends(get_db_session), _admin: User = Depends(get_admin_user)) -> Any:
     return list_reports(session)
 
 
@@ -41,7 +42,7 @@ def review_report_endpoint(
     payload: ReportReview,
     session: Session = Depends(get_db_session),
     admin: User = Depends(get_admin_user),
-) -> ReportRead:
+) -> Any:
     try:
         return review_report(session, admin, report_id, payload)
     except ValueError as exc:
@@ -53,7 +54,7 @@ def block_user_endpoint(
     payload: BlockCreate,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> BlockRead:
+) -> Any:
     try:
         return block_user(session, current_user, payload)
     except ValueError as exc:
@@ -61,5 +62,5 @@ def block_user_endpoint(
 
 
 @router.get("/blocks", response_model=list[BlockRead])
-def list_blocks_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> list[BlockRead]:
+def list_blocks_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> Any:
     return list_blocks_for_user(session, current_user)

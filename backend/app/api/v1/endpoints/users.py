@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,7 +21,7 @@ def patch_me(
     payload: ProfileUpdate,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> UserRead:
+) -> Any:
     try:
         return update_profile(session, current_user, payload)
     except ValueError as exc:
@@ -31,7 +32,7 @@ def patch_me(
 def get_public_profile(
     user_id: UUID,
     session: Session = Depends(get_db_session),
-) -> UserPublicRead:
+) -> Any:
     stmt = select(User).options(selectinload(User.profile)).where(User.id == user_id)
     user = session.scalar(stmt)
     if not user:
@@ -43,7 +44,7 @@ def get_public_profile(
 def get_user_listings(
     user_id: UUID,
     session: Session = Depends(get_db_session),
-) -> list[ListingRead]:
+) -> Any:
     stmt = (
         select(Listing)
         .options(selectinload(Listing.owner).selectinload(User.profile), selectinload(Listing.category))

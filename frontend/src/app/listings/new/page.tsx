@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
 import { showToast } from "@/components/toast";
+import { LocationPicker } from "@/components/location-picker";
 import { api } from "@/lib/api";
 import type { Category, ItemCondition } from "@/lib/types";
 
@@ -25,8 +26,10 @@ export default function NewListingPage() {
   const [price, setPrice] = useState("");
   const [condition, setCondition] = useState<ItemCondition>("USED");
   const [categoryId, setCategoryId] = useState("");
+  const [brand, setBrand] = useState("");
+  const [hasWarranty, setHasWarranty] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
-  const [city, setCity] = useState("Hà Nội");
+  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,8 +62,10 @@ export default function NewListingPage() {
         description,
         price: Number(price),
         condition,
+        brand: brand || null,
+        has_warranty: hasWarranty,
         image_urls: imageUrls.map((u) => u.trim()).filter(Boolean),
-        location_data: city ? { city } : null,
+        location_data: location ? { lat: location.lat, lng: location.lng, address: location.address } : null,
       });
       showToast("Đăng tin thành công!", "success");
       router.push(`/listings/${listing.id}`);
@@ -145,6 +150,29 @@ export default function NewListingPage() {
           </div>
         </div>
 
+        <div className="grid two">
+          <div className="field">
+            <label htmlFor="brand">Thương hiệu</label>
+            <input
+              id="brand"
+              placeholder="Ví dụ: Apple, Samsung..."
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+            />
+          </div>
+          <div className="field" style={{ display: "flex", alignItems: "center", paddingTop: 30 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontWeight: "normal" }}>
+              <input 
+                type="checkbox" 
+                checked={hasWarranty} 
+                onChange={(e) => setHasWarranty(e.target.checked)} 
+                style={{ width: 18, height: 18 }}
+              />
+              Sản phẩm còn bảo hành
+            </label>
+          </div>
+        </div>
+
         <div className="field">
           <label>Hình ảnh (URL)</label>
           {imageUrls.map((url, i) => (
@@ -166,13 +194,8 @@ export default function NewListingPage() {
         </div>
 
         <div className="field">
-          <label htmlFor="city">Thành phố</label>
-          <input
-            id="city"
-            placeholder="Hà Nội, TP.HCM, Đà Nẵng..."
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-          />
+          <label>Vị trí giao dịch</label>
+          <LocationPicker value={location} onChange={setLocation} />
         </div>
 
         {error ? <div className="alert alert-danger">{error}</div> : null}

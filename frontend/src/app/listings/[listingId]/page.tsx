@@ -24,6 +24,9 @@ export default function ListingDetailPage() {
   const [reportReason, setReportReason] = useState("");
   const [favorited, setFavorited] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [newQuestion, setNewQuestion] = useState("");
+  const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
     let active = true;
@@ -39,11 +42,57 @@ export default function ListingDetailPage() {
             setRelatedListings(all.filter((l) => l.id !== item.id).slice(0, 4));
           });
         }
+        
+        // Load questions
+        fetch(`http://localhost:8000/api/v1/listings/${params.listingId}/questions`).then(res => res.json()).then(data => {
+            if (active && Array.isArray(data)) setQuestions(data);
+        }).catch(() => {});
+        
       },
       () => { if (active) setLoading(false); },
     );
     return () => { active = false; };
   }, [params.listingId]);
+
+  const handleAskQuestion = async () => {
+    if (!token) return showToast("Vui lòng đăng nhập để gửi câu hỏi", "default");
+    if (!newQuestion.trim()) return;
+    try {
+        const res = await fetch(`http://localhost:8000/api/v1/listings/${params.listingId}/questions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ question: newQuestion })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setQuestions([data, ...questions]);
+            setNewQuestion("");
+            showToast("Đã gửi câu hỏi", "success");
+        }
+    } catch (e) {
+        showToast("Lỗi khi gửi câu hỏi", "danger");
+    }
+  };
+
+  const handleAnswerQuestion = async (questionId: string) => {
+    const text = replyText[questionId];
+    if (!text || !text.trim()) return;
+    try {
+        const res = await fetch(`http://localhost:8000/api/v1/listings/questions/${questionId}/answer`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ answer: text })
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setQuestions(questions.map(q => q.id === questionId ? data : q));
+            setReplyText({ ...replyText, [questionId]: "" });
+            showToast("Đã trả lời câu hỏi", "success");
+        }
+    } catch (e) {
+        showToast("Lỗi khi trả lời", "danger");
+    }
+  };
 
   const handleFavorite = async () => {
     if (!token || !listing) return;
@@ -203,6 +252,53 @@ export default function ListingDetailPage() {
                   💬 Nhắn tin
                 </button>
               ) : null}
+            </div>
+          </div>
+
+          {/* Q&A Section */}
+          <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Hỏi & Đáp ({questions.length})</h3>
+            
+            {!isOwner && (
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <input 
+                  placeholder="Đặt câu hỏi cho người bán..." 
+                  value={newQuestion} 
+                  onChange={e => setNewQuestion(e.target.value)}
+                  style={{ flex: 1 }}
+                />
+                <button className="button primary" onClick={handleAskQuestion}>Gửi</button>
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}>
+              {questions.map(q => (
+                <div key={q.id} style={{ display: "flex", flexDirection: "column", gap: 6, padding: 12, background: "var(--bg-inset)", borderRadius: "var(--radius-sm)" }}>
+                  <div className="split">
+                    <strong style={{ fontSize: 14 }}>{q.asker?.profile?.display_name || q.asker?.profile?.full_name || "Người dùng ẩn"}</strong>
+                    <span className="muted" style={{ fontSize: 12 }}>{timeAgo(q.created_at)}</span>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 14 }}>Q: {q.question}</p>
+                  
+                  {q.answer ? (
+                    <div style={{ paddingLeft: 12, borderLeft: "2px solid var(--accent)", marginTop: 4 }}>
+                      <strong style={{ fontSize: 13, color: "var(--accent)" }}>Người bán:</strong>
+                      <p style={{ margin: 0, fontSize: 14 }}>{q.answer}</p>
+                    </div>
+                  ) : isOwner ? (
+                    <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                      <input 
+                        placeholder="Trả lời câu hỏi này..." 
+                        value={replyText[q.id] || ""}
+                        onChange={e => setReplyText({...replyText, [q.id]: e.target.value})}
+                        style={{ flex: 1, padding: "6px 10px", fontSize: 13 }}
+                      />
+                      <button className="button secondary sm" onClick={() => handleAnswerQuestion(q.id)}>Trả lời</button>
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+              {questions.length === 0 && <div className="muted" style={{ fontSize: 14, textAlign: "center", padding: "12px 0" }}>Chưa có câu hỏi nào.</div>}
             </div>
           </div>
         </section>

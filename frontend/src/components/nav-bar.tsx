@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { useAuth } from "@/components/auth-provider";
+import { SearchBox } from "@/components/search-box";
 
 export function NavBar() {
   const pathname = usePathname();
@@ -29,6 +30,8 @@ export function NavBar() {
       <div className="nav-brand">
         <Link href="/">Chợ Đồ Cũ</Link>
       </div>
+
+      <SearchBox />
 
       <button
         className="nav-toggle"

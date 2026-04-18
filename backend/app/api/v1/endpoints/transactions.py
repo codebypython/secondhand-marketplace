@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -18,19 +19,24 @@ from app.services.transactions import (
     list_user_deals,
     list_user_offers,
     schedule_meetup,
+    counter_offer,
+    update_delivery_status,
+    file_dispute,
+    check_in_meetup,
 )
+from app.schemas.transaction import CounterOfferCreate, DealDeliveryUpdate, DealDisputeCreate
 
 router = APIRouter()
 
 
-def _offer_to_read(offer) -> OfferRead:
+def _offer_to_read(offer) -> Any:
     data = OfferRead.model_validate(offer)
     if hasattr(offer, "listing") and offer.listing:
         data.listing_title = offer.listing.title
     return data
 
 
-def _deal_to_read(deal) -> DealRead:
+def _deal_to_read(deal) -> Any:
     data = DealRead.model_validate(deal)
     if hasattr(deal, "listing") and deal.listing:
         data.listing_title = deal.listing.title
@@ -44,7 +50,7 @@ def create_offer_endpoint(
     payload: OfferCreate,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> OfferRead:
+) -> Any:
     try:
         return create_offer(session, current_user, payload)
     except ValueError as exc:
@@ -52,13 +58,26 @@ def create_offer_endpoint(
 
 
 @router.get("/offers/mine", response_model=list[OfferRead])
-def my_offers(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> list[OfferRead]:
+def my_offers(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> Any:
     return [_offer_to_read(o) for o in list_user_offers(session, current_user)]
 
 
 @router.get("/offers/received", response_model=list[OfferRead])
-def received_offers(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> list[OfferRead]:
+def received_offers(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> Any:
     return [_offer_to_read(o) for o in list_owner_offers(session, current_user)]
+
+
+@router.post("/offers/{offer_id}/counter", response_model=OfferRead)
+def counter_offer_endpoint(
+    offer_id: UUID,
+    payload: CounterOfferCreate,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    try:
+        return counter_offer(session, current_user, offer_id, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/offers/{offer_id}/accept", response_model=DealRead)
@@ -66,7 +85,7 @@ def accept_offer_endpoint(
     offer_id: UUID,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> DealRead:
+) -> Any:
     try:
         return accept_offer(session, current_user, offer_id)
     except ValueError as exc:
@@ -78,7 +97,7 @@ def decline_offer_endpoint(
     offer_id: UUID,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> OfferRead:
+) -> Any:
     try:
         return decline_offer(session, current_user, offer_id)
     except ValueError as exc:
@@ -90,7 +109,7 @@ def cancel_offer_endpoint(
     offer_id: UUID,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> OfferRead:
+) -> Any:
     try:
         return cancel_offer(session, current_user, offer_id)
     except ValueError as exc:
@@ -98,7 +117,7 @@ def cancel_offer_endpoint(
 
 
 @router.get("/deals", response_model=list[DealRead])
-def list_deals_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> list[DealRead]:
+def list_deals_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> Any:
     return [_deal_to_read(d) for d in list_user_deals(session, current_user)]
 
 
@@ -107,7 +126,7 @@ def complete_deal_endpoint(
     deal_id: UUID,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> DealRead:
+) -> Any:
     try:
         return complete_deal(session, current_user, deal_id)
     except ValueError as exc:
@@ -119,9 +138,35 @@ def cancel_deal_endpoint(
     deal_id: UUID,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> DealRead:
+) -> Any:
     try:
         return cancel_deal(session, current_user, deal_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.patch("/deals/{deal_id}/delivery", response_model=DealRead)
+def update_delivery_endpoint(
+    deal_id: UUID,
+    payload: DealDeliveryUpdate,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    try:
+        return update_delivery_status(session, current_user, str(deal_id), payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/deals/{deal_id}/dispute", response_model=DealRead)
+def file_dispute_endpoint(
+    deal_id: UUID,
+    payload: DealDisputeCreate,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    try:
+        return file_dispute(session, current_user, str(deal_id), payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -131,8 +176,20 @@ def schedule_meetup_endpoint(
     payload: MeetupCreate,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> MeetupRead:
+) -> Any:
     try:
         return schedule_meetup(session, current_user, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/meetups/{meetup_id}/check-in", response_model=MeetupRead)
+def check_in_meetup_endpoint(
+    meetup_id: UUID,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    try:
+        return check_in_meetup(session, current_user, str(meetup_id))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

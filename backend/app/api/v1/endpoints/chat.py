@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,7 +20,7 @@ router = APIRouter()
 
 
 @router.get("/conversations", response_model=list[ConversationRead])
-def list_conversations_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> list[ConversationRead]:
+def list_conversations_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> Any:
     return list_conversations(session, current_user)
 
 
@@ -28,7 +29,7 @@ def create_conversation_endpoint(
     payload: ConversationCreate,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> ConversationRead:
+) -> Any:
     try:
         return create_conversation(session, current_user, payload)
     except ValueError as exc:
@@ -40,7 +41,7 @@ def get_conversation_endpoint(
     conversation_id: UUID,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> ConversationRead:
+) -> Any:
     try:
         conversation = get_conversation_or_error(session, conversation_id)
     except ValueError as exc:
@@ -55,7 +56,7 @@ def send_message_endpoint(
     payload: MessageCreate,
     session: Session = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
-) -> MessageRead:
+) -> Any:
     try:
         return send_message(session, current_user, payload)
     except ValueError as exc:

@@ -2,19 +2,21 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum as SAEnum
+from datetime import date
+from sqlalchemy import Date, Enum as SAEnum
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db.base import Base
 from app.models.associations import conversation_participant, user_favorite_listing
 from app.models.enums import UserRole, UserStatus
-from app.models.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.models.mixins import JSONBSqlType, SoftDeleteMixin, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
     from app.models.chat import Conversation, Message
     from app.models.listing import Listing
     from app.models.transaction import Deal, Offer
+    from app.models.social import UserFollow, Review, Wishlist
 
 
 class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -57,6 +59,11 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         secondary=conversation_participant,
         back_populates="participants",
     )
+    wishlists: Mapped[list[Wishlist]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    followers: Mapped[list[UserFollow]] = relationship(foreign_keys="UserFollow.following_id", cascade="all, delete-orphan")
+    following: Mapped[list[UserFollow]] = relationship(foreign_keys="UserFollow.follower_id", cascade="all, delete-orphan")
+    reviews_received: Mapped[list[Review]] = relationship(foreign_keys="Review.target_id", cascade="all, delete-orphan")
+    reviews_given: Mapped[list[Review]] = relationship(foreign_keys="Review.reviewer_id")
 
     @validates("email")
     def validate_email(self, _key: str, value: str) -> str:
@@ -81,5 +88,14 @@ class Profile(Base, UUIDMixin, TimestampMixin):
     full_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String(1024))
     bio: Mapped[str | None] = mapped_column(String(1000))
+    
+    display_name: Mapped[str | None] = mapped_column(String(255))
+    phone: Mapped[str | None] = mapped_column(String(20))
+    address: Mapped[str | None] = mapped_column(String(500))
+    dob: Mapped[date | None] = mapped_column(Date)
+    social_links: Mapped[dict | None] = mapped_column(JSONBSqlType)
+    privacy_settings: Mapped[dict | None] = mapped_column(JSONBSqlType)
+    banner_url: Mapped[str | None] = mapped_column(String(1024))
+    shop_slug: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
 
     user: Mapped[User] = relationship(back_populates="profile")

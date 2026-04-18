@@ -15,12 +15,15 @@ from app.models.mixins import JSONBSqlType, SoftDeleteMixin, TimestampMixin, UUI
 if TYPE_CHECKING:
     from app.models.transaction import Deal, Offer
     from app.models.user import User
+    from app.models.social import ListingQuestion
 
 
 class Category(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     __tablename__ = "categories"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    slug: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    image_url: Mapped[str | None] = mapped_column(String(1000))
     parent_id: Mapped[str | None] = mapped_column(ForeignKey("categories.id", ondelete="SET NULL"))
 
     parent: Mapped[Category | None] = relationship(remote_side="Category.id", back_populates="children")
@@ -46,6 +49,8 @@ class Listing(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         default=ItemCondition.USED,
         nullable=False,
     )
+    brand: Mapped[str | None] = mapped_column(String(255))
+    has_warranty: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
     location_data: Mapped[dict[str, Any] | None] = mapped_column(JSONBSqlType)
     image_urls: Mapped[list[str]] = mapped_column(JSONBSqlType, default=list, nullable=False)
     status: Mapped[ListingStatus] = mapped_column(
@@ -62,6 +67,7 @@ class Listing(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         secondary=user_favorite_listing,
         back_populates="favorites",
     )
+    questions: Mapped[list[ListingQuestion]] = relationship(back_populates="listing", cascade="all, delete-orphan")
 
     def is_available(self) -> bool:
         return self.status == ListingStatus.AVAILABLE and not self.is_deleted

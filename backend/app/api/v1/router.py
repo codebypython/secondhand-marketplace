@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, chat, health, listings, moderation, transactions, users
+from app.api.v1.endpoints import auth, chat, health, listings, moderation, transactions, users, social
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
@@ -10,3 +10,4 @@ api_router.include_router(listings.router, prefix="/listings", tags=["listings"]
 api_router.include_router(transactions.router, prefix="/transactions", tags=["transactions"])
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"])
 api_router.include_router(moderation.router, prefix="/moderation", tags=["moderation"])
+api_router.include_router(social.router, tags=["social"])

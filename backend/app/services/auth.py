@@ -40,6 +40,13 @@ def login_user(session: Session, payload: LoginRequest) -> TokenResponse:
 def update_profile(session: Session, user: User, payload: ProfileUpdate) -> User:
     profile = user.profile or Profile(user=user, full_name=user.email.split("@")[0])
     updates = payload.model_dump(exclude_unset=True)
+    
+    if "shop_slug" in updates and updates["shop_slug"] is not None:
+        slug = updates["shop_slug"]
+        existing = session.scalar(select(Profile).where(Profile.shop_slug == slug, Profile.id != profile.id))
+        if existing:
+            raise ValueError("Shop slug is already taken")
+
     for field, value in updates.items():
         setattr(profile, field, value)
     session.add(profile)

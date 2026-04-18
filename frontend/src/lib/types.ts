@@ -2,15 +2,24 @@ export type UserRole = "USER" | "ADMIN";
 export type UserStatus = "ACTIVE" | "BANNED";
 export type ListingStatus = "AVAILABLE" | "RESERVED" | "SOLD" | "HIDDEN";
 export type ItemCondition = "NEW" | "LIKE_NEW" | "USED" | "DAMAGED";
-export type OfferStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED" | "EXPIRED";
+export type OfferStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED" | "EXPIRED" | "COUNTERED";
 export type DealStatus = "OPEN" | "CANCELLED" | "COMPLETED";
+export type DeliveryStatus = "PENDING" | "SHIPPING" | "DELIVERED";
 export type MeetupStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
 export type ReportStatus = "PENDING" | "RESOLVED" | "DISMISSED";
 
 export interface Profile {
   id: string;
   full_name: string;
+  display_name?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  dob?: string | null;
+  social_links?: Record<string, string> | null;
+  privacy_settings?: Record<string, any> | null;
   avatar_url?: string | null;
+  banner_url?: string | null;
+  shop_slug?: string | null;
   bio?: string | null;
 }
 
@@ -32,6 +41,8 @@ export interface UserPublic {
 export interface Category {
   id: string;
   name: string;
+  slug?: string | null;
+  image_url?: string | null;
   parent_id?: string | null;
 }
 
@@ -43,6 +54,8 @@ export interface Listing {
   description?: string | null;
   price: string;
   condition: ItemCondition;
+  brand?: string | null;
+  has_warranty?: boolean;
   location_data?: Record<string, unknown> | null;
   image_urls: string[];
   status: ListingStatus;
@@ -58,16 +71,21 @@ export interface Offer {
   buyer_id: string;
   price: string;
   status: OfferStatus;
+  parent_offer_id?: string | null;
+  is_counter_from_seller: boolean;
+  expires_at?: string | null;
   created_at: string;
-  listing_title?: string | null;
+  listing_title?: string;
 }
 
 export interface Meetup {
   id: string;
   deal_id: string;
   scheduled_at: string;
-  location?: Record<string, unknown> | null;
+  location?: { lat: number; lng: number; address?: string } | null;
   status: MeetupStatus;
+  buyer_checked_in: boolean;
+  seller_checked_in: boolean;
   created_at: string;
 }
 
@@ -78,8 +96,12 @@ export interface Deal {
   seller_id: string;
   agreed_price: string;
   status: DealStatus;
+  delivery_status: DeliveryStatus;
+  tracking_code?: string | null;
+  has_dispute: boolean;
+  dispute_reason?: string | null;
   created_at: string;
-  listing_title?: string | null;
+  listing_title?: string;
   meetups?: Meetup[];
 }
 

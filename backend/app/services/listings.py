@@ -12,7 +12,7 @@ def list_categories(session: Session) -> list[Category]:
 
 
 def create_category(session: Session, payload: CategoryCreate) -> Category:
-    category = Category(name=payload.name, parent_id=payload.parent_id)
+    category = Category(name=payload.name, parent_id=payload.parent_id, slug=payload.slug, image_url=payload.image_url)
     session.add(category)
     session.commit()
     session.refresh(category)
@@ -39,13 +39,14 @@ def get_listing_or_error(session: Session, listing_id) -> Listing:
     return listing
 
 
-def list_listings(session: Session, search: str | None = None, category_id=None, condition=None, status: ListingStatus | None = None, owner_id=None) -> list[Listing]:
+def list_listings(session: Session, search: str | None = None, category_id=None, condition=None, status: ListingStatus | None = None, owner_id=None, include_deleted: bool = False) -> list[Listing]:
     stmt = select(Listing).options(
         selectinload(Listing.owner).selectinload(User.profile),
         selectinload(Listing.category),
     )
     if search:
-        stmt = stmt.where(Listing.title.ilike(f"%{search}%"))
+        search_term = f"%{search}%"
+        stmt = stmt.where(Listing.title.ilike(search_term) | Listing.description.ilike(search_term))
     if category_id:
         stmt = stmt.where(Listing.category_id == category_id)
     if condition:
@@ -54,6 +55,8 @@ def list_listings(session: Session, search: str | None = None, category_id=None,
         stmt = stmt.where(Listing.status == status)
     if owner_id:
         stmt = stmt.where(Listing.owner_id == owner_id)
+    if not include_deleted:
+        stmt = stmt.where(Listing.deleted_at.is_(None))
     stmt = stmt.order_by(Listing.created_at.desc())
     return list(session.scalars(stmt).unique())
 
@@ -77,6 +80,25 @@ def delete_listing(session: Session, actor: User, listing_id) -> None:
     listing.soft_delete()
     session.add(listing)
     session.commit()
+
+
+def restore_listing(session: Session, actor: User, listing_id) -> Listing:
+    stmt = (
+        select(Listing)
+        .options(selectinload(Listing.owner).selectinload(User.profile), selectinload(Listing.category))
+        .where(Listing.id == listing_id)
+    )
+    listing = session.scalar(stmt)
+    if not listing:
+        raise ValueError("Listing not found")
+    if listing.owner_id != actor.id:
+        raise ValueError("Only the owner can restore this listing")
+        
+    listing.deleted_at = None
+    listing.touch()
+    session.add(listing)
+    session.commit()
+    return listing
 
 
 def toggle_favorite(session: Session, user: User, listing_id) -> bool:

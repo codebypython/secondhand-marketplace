@@ -1,3 +1,4 @@
+from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -12,7 +13,7 @@ router = APIRouter()
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-def register(payload: RegisterRequest, session: Session = Depends(get_db_session)) -> TokenResponse:
+def register(payload: RegisterRequest, session: Session = Depends(get_db_session)) -> Any:
     try:
         return register_user(session, payload)
     except ValueError as exc:
@@ -20,7 +21,7 @@ def register(payload: RegisterRequest, session: Session = Depends(get_db_session
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: LoginRequest, session: Session = Depends(get_db_session)) -> TokenResponse:
+def login(payload: LoginRequest, session: Session = Depends(get_db_session)) -> Any:
     try:
         return login_user(session, payload)
     except ValueError as exc:
@@ -28,5 +29,5 @@ def login(payload: LoginRequest, session: Session = Depends(get_db_session)) -> 
 
 
 @router.get("/me", response_model=UserRead)
-def me(current_user: User = Depends(get_current_user)) -> User:
+def me(current_user: User = Depends(get_current_user)) -> Any:
     return current_user

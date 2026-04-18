@@ -17,7 +17,7 @@ export default function UserProfilePage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<"listings" | "reviews">("listings");
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<unknown[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const { token, user: currentUser } = useAuth();
 
@@ -62,7 +62,7 @@ export default function UserProfilePage() {
         await fetch(`http://localhost:8000/api/v1/users/${params.userId}/follow`, { method: "POST", headers: { Authorization: `Bearer ${token}` }});
         setIsFollowing(true);
       }
-    } catch (e) {
+    } catch (_e) {
       alert("Lỗi khi theo dõi");
     }
   };

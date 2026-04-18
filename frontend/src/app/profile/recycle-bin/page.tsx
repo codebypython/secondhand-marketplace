@@ -8,7 +8,7 @@ import { PageShell } from "@/components/page-shell";
 import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Listing } from "@/lib/types";
-import { conditionLabels, formatPrice, statusLabels, timeAgo } from "@/lib/utils";
+import { conditionLabels, formatPrice, statusLabels } from "@/lib/utils";
 
 export default function RecycleBinPage() {
   const { token, loading: authLoading } = useAuth();

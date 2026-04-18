@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
-import { api } from "@/lib/api";
 
 export function SearchBox() {
   const router = useRouter();

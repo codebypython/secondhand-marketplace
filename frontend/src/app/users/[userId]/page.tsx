@@ -180,7 +180,7 @@ export default function UserProfilePage() {
             </button>
           </div>
 
-          {activeTab === "listings" ? (
+          {activeTab === "listings" && (
             listings.length === 0 ? (
               <div className="empty-state panel">
                 <div className="empty-icon">📦</div>
@@ -211,7 +211,9 @@ export default function UserProfilePage() {
                 })}
               </div>
             )
-          ) : (
+          )}
+
+          {activeTab === "reviews" && (
             reviews.length === 0 ? (
               <div className="empty-state panel">
                 <div className="empty-icon">⭐</div>

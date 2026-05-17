@@ -69,7 +69,7 @@ export default function ListingDetailPage() {
             setNewQuestion("");
             showToast("Đã gửi câu hỏi", "success");
         }
-    } catch (_e) {
+    } catch {
         showToast("Lỗi khi gửi câu hỏi", "danger");
     }
   };
@@ -89,7 +89,7 @@ export default function ListingDetailPage() {
             setReplyText({ ...replyText, [questionId]: "" });
             showToast("Đã trả lời câu hỏi", "success");
         }
-    } catch (_e) {
+    } catch {
         showToast("Lỗi khi trả lời", "danger");
     }
   };

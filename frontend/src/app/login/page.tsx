@@ -4,13 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useAuth } from "@/components/auth-provider";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { showToast } from "@/components/toast";
-import { api } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setSession } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -22,8 +21,7 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.login({ email, password });
-      setSession(result.access_token, result.user);
+      await login({ email, password });
       showToast("Đăng nhập thành công!", "success");
       router.push("/");
     } catch (err) {

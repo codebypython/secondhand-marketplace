@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Gem, Sparkles, Archive, Wrench } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -10,11 +11,11 @@ import { LocationPicker } from "@/components/location-picker";
 import { api } from "@/lib/api";
 import type { Category, ItemCondition } from "@/lib/types";
 
-const CONDITIONS: { value: ItemCondition; label: string; icon: string }[] = [
-  { value: "NEW", label: "Mới", icon: "✨" },
-  { value: "LIKE_NEW", label: "Như mới", icon: "🌟" },
-  { value: "USED", label: "Đã dùng", icon: "📦" },
-  { value: "DAMAGED", label: "Hỏng", icon: "🔧" },
+const CONDITIONS: { value: ItemCondition; label: string; Icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }> }[] = [
+  { value: "NEW", label: "Mới", Icon: Gem },
+  { value: "LIKE_NEW", label: "Như mới", Icon: Sparkles },
+  { value: "USED", label: "Đã dùng", Icon: Archive },
+  { value: "DAMAGED", label: "Hỏng", Icon: Wrench },
 ];
 
 export default function NewListingPage() {
@@ -137,16 +138,21 @@ export default function NewListingPage() {
         <div className="field">
           <label>Tình trạng *</label>
           <div className="condition-grid">
-            {CONDITIONS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                className={`condition-option${condition === c.value ? " selected" : ""}`}
-                onClick={() => setCondition(c.value)}
-              >
-                {c.icon} {c.label}
-              </button>
-            ))}
+            {CONDITIONS.map((c) => {
+              const Icon = c.Icon;
+              return (
+                <button
+                  key={c.value}
+                  type="button"
+                  className={`condition-option${condition === c.value ? " selected" : ""}`}
+                  onClick={() => setCondition(c.value)}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, fontSize: 14 }}
+                >
+                  <Icon size={18} strokeWidth={1.5} />
+                  {c.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 

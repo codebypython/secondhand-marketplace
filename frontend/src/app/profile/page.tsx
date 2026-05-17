@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { Crown, User, CheckCircle, AlertTriangle, TrendingUp, Trash2, Edit } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -76,7 +77,7 @@ export default function ProfilePage() {
         {/* Left: Account info + edit */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Profile card */}
-          <div className="panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: 32 }}>
+          <div className="profile-info-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
             <div style={{
               width: 80, height: 80, borderRadius: "var(--radius-full)",
               background: "var(--accent)", color: "var(--text-inverse)",
@@ -88,39 +89,63 @@ export default function ProfilePage() {
               <div className="muted">{user.email}</div>
               {user.profile?.bio ? <p className="muted" style={{ marginTop: 8, lineHeight: 1.6 }}>{user.profile.bio}</p> : null}
             </div>
-            <div className="divider" style={{ width: "100%" }} />
-            <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
-              <div className="split">
-                <span className="muted" style={{ fontSize: 13 }}>Vai trò</span>
-                <span className={`badge ${user.role === "ADMIN" ? "badge-accent" : ""}`}>{user.role === "ADMIN" ? "Quản trị" : "Người dùng"}</span>
+            <div className="profile-divider" />
+            
+            {/* Stat cards grid */}
+            <div className="profile-stats" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))", gap: 12, width: "100%" }}>
+              <div className="stat-card" style={{ padding: 14, background: "var(--bg-inset)", borderRadius: "var(--radius)", textAlign: "center" }}>
+                <div className="stat-card-label" style={{ fontSize: 11, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Vai trò</div>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                  {user.role === "ADMIN" ? (
+                    <Crown size={28} style={{ color: "#f59e0b" }} />
+                  ) : (
+                    <User size={28} style={{ color: "var(--text)" }} />
+                  )}
+                </div>
+                <div className="stat-card-value" style={{ fontSize: 13, fontWeight: 600 }}>{user.role === "ADMIN" ? "Quản trị viên" : "Người dùng"}</div>
               </div>
-              <div className="split">
-                <span className="muted" style={{ fontSize: 13 }}>Trạng thái</span>
-                <span className={`badge ${user.status === "ACTIVE" ? "badge-success" : "badge-danger"}`}>{user.status === "ACTIVE" ? "Hoạt động" : "Bị cấm"}</span>
+              <div className="stat-card" style={{ padding: 14, background: "var(--bg-inset)", borderRadius: "var(--radius)", textAlign: "center" }}>
+                <div className="stat-card-label" style={{ fontSize: 11, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Trạng thái</div>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                  {user.status === "ACTIVE" ? (
+                    <CheckCircle size={28} style={{ color: "#4ade80" }} />
+                  ) : (
+                    <AlertTriangle size={28} style={{ color: "#ef4444" }} />
+                  )}
+                </div>
+                <div className="stat-card-value" style={{ fontSize: 13, fontWeight: 600, color: user.status === "ACTIVE" ? "#4ade80" : "#ef4444" }}>
+                  {user.status === "ACTIVE" ? "Hoạt động" : "Ngừng hoạt động"}
+                </div>
               </div>
-              <div className="split">
-                <span className="muted" style={{ fontSize: 13 }}>Ngày tạo</span>
-                <span style={{ fontSize: 13 }}>{formatDate(user.created_at)}</span>
+              <div className="stat-card" style={{ padding: 14, background: "var(--bg-inset)", borderRadius: "var(--radius)", textAlign: "center" }}>
+                <div className="stat-card-label" style={{ fontSize: 11, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Đang bán</div>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                  <TrendingUp size={28} style={{ color: "var(--accent)" }} />
+                </div>
+                <div className="stat-card-value" style={{ fontSize: 18, fontWeight: 700 }}>{activeListings.length}</div>
               </div>
-              <div className="split">
-                <span className="muted" style={{ fontSize: 13 }}>Đang bán</span>
-                <span className="badge badge-success">{activeListings.length}</span>
-              </div>
-              <div className="split">
-                <span className="muted" style={{ fontSize: 13 }}>Đã bán</span>
-                <span className="badge badge-info">{soldListings.length}</span>
+              <div className="stat-card" style={{ padding: 14, background: "var(--bg-inset)", borderRadius: "var(--radius)", textAlign: "center" }}>
+                <div className="stat-card-label" style={{ fontSize: 11, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 8 }}>Đã bán</div>
+                <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+                  <CheckCircle size={28} style={{ color: "#4ade80" }} />
+                </div>
+                <div className="stat-card-value" style={{ fontSize: 18, fontWeight: 700 }}>{soldListings.length}</div>
               </div>
             </div>
             
-            <div className="divider" style={{ width: "100%", margin: "8px 0" }} />
-            <Link href="/profile/recycle-bin" className="button ghost" style={{ width: "100%" }}>
-              🗑️ Thùng rác (Tin đã xóa)
+            <div className="profile-divider" />
+            <Link href="/profile/recycle-bin" className="button ghost" style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+              <Trash2 size={16} />
+              Thùng rác (Tin đã xóa)
             </Link>
           </div>
 
           {/* Edit form */}
-          <form className="panel" onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>✏️ Chỉnh sửa hồ sơ</h2>
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+            <div className="profile-section-header" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Edit size={18} />
+              <span>Chỉnh sửa hồ sơ</span>
+            </div>
             <div className="field">
               <label htmlFor="fullName">Họ và tên</label>
               <input id="fullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required />

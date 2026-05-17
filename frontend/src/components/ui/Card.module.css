@@ -1,0 +1,14 @@
+.card {
+  background: var(--card-bg);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-medium), box-shadow var(--transition-medium);
+  border: 1px solid rgba(255,255,255,0.02);
+}
+.card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
+.cardHeader { font-weight: var(--font-weight-semibold); margin-bottom: 8px; }
+.cardBody { font-size: 14px; color: var(--text-muted); }
+.cardElevated { box-shadow: var(--shadow-lg); }
+

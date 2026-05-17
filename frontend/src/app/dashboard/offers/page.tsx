@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import { ShoppingBag, BarChart3, Handshake, CheckCircle, AlertTriangle } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -228,14 +229,17 @@ export default function OffersDashboardPage() {
   return (
     <PageShell title="Quản lý giao dịch" description="Theo dõi đề xuất giá, thỏa thuận mua bán và hẹn gặp giao dịch">
       <div className="tabs">
-        <button className={`tab${tab === "sent" ? " active" : ""}`} type="button" onClick={() => setTab("sent")}>
-          📤 Mua ({myOffers.length})
+        <button className={`tab${tab === "sent" ? " active" : ""}`} type="button" onClick={() => setTab("sent")} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <ShoppingBag size={18} />
+          Mua ({myOffers.length})
         </button>
-        <button className={`tab${tab === "received" ? " active" : ""}`} type="button" onClick={() => setTab("received")}>
-          📥 Bán ({receivedOffers.length})
+        <button className={`tab${tab === "received" ? " active" : ""}`} type="button" onClick={() => setTab("received")} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <BarChart3 size={18} />
+          Bán ({receivedOffers.length})
         </button>
-        <button className={`tab${tab === "deals" ? " active" : ""}`} type="button" onClick={() => setTab("deals")}>
-          🤝 Thỏa thuận ({deals.length})
+        <button className={`tab${tab === "deals" ? " active" : ""}`} type="button" onClick={() => setTab("deals")} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Handshake size={18} />
+          Thỏa thuận ({deals.length})
         </button>
       </div>
 
@@ -246,20 +250,20 @@ export default function OffersDashboardPage() {
       {/* OFFERS (Buy/Sell) */}
       {!loading && tab === "sent" ? (
         myOffers.length === 0 ? (
-          <div className="empty-state"><div className="empty-icon">📤</div><h3>Chưa có đề xuất nào</h3><p>Bạn chưa gửi đề xuất mua sản phẩm nào.</p></div>
+          <div className="empty-state"><div className="empty-icon"><ShoppingBag size={48} style={{ color: "var(--text-tertiary)" }} /></div><h3>Chưa có đề xuất nào</h3><p>Bạn chưa gửi đề xuất mua sản phẩm nào.</p></div>
         ) : <div className="grid" style={{ gap: 12 }}>{myOffers.map(o => renderOfferItem(o, "sent"))}</div>
       ) : null}
 
       {!loading && tab === "received" ? (
         receivedOffers.length === 0 ? (
-          <div className="empty-state"><div className="empty-icon">📥</div><h3>Chưa nhận đề xuất nào</h3><p>Chưa có ai gửi đề xuất giá cho sản phẩm của bạn.</p></div>
+          <div className="empty-state"><div className="empty-icon"><BarChart3 size={48} style={{ color: "var(--text-tertiary)" }} /></div><h3>Chưa nhận đề xuất nào</h3><p>Chưa có ai gửi đề xuất giá cho sản phẩm của bạn.</p></div>
         ) : <div className="grid" style={{ gap: 12 }}>{receivedOffers.map(o => renderOfferItem(o, "received"))}</div>
       ) : null}
 
       {/* DEALS */}
       {!loading && tab === "deals" ? (
         deals.length === 0 ? (
-          <div className="empty-state"><div className="empty-icon">🤝</div><h3>Chưa có thỏa thuận nào</h3><p>Thỏa thuận sẽ xuất hiện sau khi chấp nhận đề xuất giá.</p></div>
+          <div className="empty-state"><div className="empty-icon"><Handshake size={48} style={{ color: "var(--text-tertiary)" }} /></div><h3>Chưa có thỏa thuận nào</h3><p>Thỏa thuận sẽ xuất hiện sau khi chấp nhận đề xuất giá.</p></div>
         ) : (
           <div className="grid" style={{ gap: 16 }}>
             {deals.map((deal) => {

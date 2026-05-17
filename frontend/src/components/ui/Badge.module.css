@@ -1,0 +1,16 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1;
+}
+
+.default { background: rgba(255,255,255,0.08); color: var(--text); }
+.success { background: rgba(87, 202, 123, 0.16); color: #8be0a9; }
+.warning { background: rgba(249, 177, 122, 0.18); color: var(--color-peach); }
+.danger { background: rgba(255, 120, 120, 0.18); color: #ff9a9a; }

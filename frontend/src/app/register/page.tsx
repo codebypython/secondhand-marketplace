@@ -4,13 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { useAuth } from "@/components/auth-provider";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { showToast } from "@/components/toast";
-import { api } from "@/lib/api";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const { setSession } = useAuth();
+  const { register } = useAuth();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,8 +26,7 @@ export default function RegisterPage() {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.register({ email, password, full_name: fullName });
-      setSession(result.access_token, result.user);
+      await register({ email, password, full_name: fullName });
       showToast("Tạo tài khoản thành công!", "success");
       router.push("/");
     } catch (err) {

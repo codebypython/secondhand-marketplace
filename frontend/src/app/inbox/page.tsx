@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Mail, Plus, X, MessageCircle } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -121,27 +122,26 @@ export default function InboxPage() {
     <PageShell title="Hộp thư" description="Nhắn tin với người mua và người bán">
       <div className="grid two" style={{ gridTemplateColumns: "340px 1fr", minHeight: 560 }}>
         {/* Left: Conversation list */}
-        <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 0, padding: 0, overflow: "hidden" }}>
-          <div style={{ padding: "14px 16px 10px", borderBottom: "1px solid var(--border)" }}>
-            <div className="split" style={{ marginBottom: 10 }}>
-              <span style={{ fontWeight: 700, fontSize: 16 }}>💬 Hội thoại</span>
-              <button className="button ghost sm" type="button" onClick={() => setShowCreate(!showCreate)}>
-                {showCreate ? "✕" : "＋ Mới"}
-              </button>
+        <div className="inbox-section" style={{ display: "flex", flexDirection: "column", gap: 0, padding: 0, overflow: "hidden" }}>
+          <div className="inbox-section-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <MessageCircle size={18} />
+              <span>Hội thoại</span>
             </div>
-            <input
-              placeholder="🔍 Tìm kiếm hội thoại..."
-              value={searchConv}
-              onChange={(e) => setSearchConv(e.target.value)}
-              style={{
-                width: "100%", border: "1px solid var(--border)", borderRadius: "var(--radius)",
-                padding: "8px 12px", fontSize: 13, background: "var(--bg-inset)", outline: "none",
-              }}
-            />
+            <button className="button ghost sm" type="button" onClick={() => setShowCreate(!showCreate)} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              {showCreate ? <X size={16} /> : <Plus size={16} />}
+              {showCreate ? "Hủy" : "Mới"}
+            </button>
           </div>
+          <input
+            className="inbox-search"
+            placeholder="🔍 Tìm kiếm hội thoại..."
+            value={searchConv}
+            onChange={(e) => setSearchConv(e.target.value)}
+          />
 
           {showCreate ? (
-            <div style={{ padding: 14, borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ padding: 14, borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
               <div className="field">
                 <label style={{ fontSize: 12 }}>ID người tham gia</label>
                 <input placeholder="UUID..." value={participantId} onChange={(e) => setParticipantId(e.target.value)} style={{ fontSize: 13 }} />
@@ -162,8 +162,8 @@ export default function InboxPage() {
             {loading ? (
               <div style={{ padding: 16 }}>{[1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 64, marginBottom: 4, borderRadius: "var(--radius)" }} />)}</div>
             ) : filteredConversations.length === 0 ? (
-              <div className="empty-state" style={{ padding: "32px 16px" }}>
-                <div className="empty-icon">💬</div>
+              <div className="inbox-empty">
+                <div style={{ fontSize: 24 }}><MessageCircle size={40} style={{ color: "var(--text-tertiary)", margin: "0 auto" }} /></div>
                 <h3>{searchConv ? "Không tìm thấy" : "Chưa có hội thoại"}</h3>
                 <p>{searchConv ? "Thử tìm kiếm khác" : "Bắt đầu nhắn tin từ trang chi tiết sản phẩm."}</p>
               </div>

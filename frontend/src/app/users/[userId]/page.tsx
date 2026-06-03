@@ -10,6 +10,19 @@ import { api } from "@/lib/api";
 import type { Listing, UserPublic } from "@/lib/types";
 import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
 
+interface ReviewItem {
+  id: string;
+  rating: number;
+  comment?: string | null;
+  created_at: string;
+  reviewer?: {
+    profile?: {
+      display_name?: string | null;
+      full_name?: string | null;
+    } | null;
+  } | null;
+}
+
 export default function UserProfilePage() {
   const params = useParams<{ userId: string }>();
   const [userProfile, setUserProfile] = useState<UserPublic | null>(null);
@@ -17,7 +30,7 @@ export default function UserProfilePage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [activeTab, setActiveTab] = useState<"listings" | "reviews">("listings");
-  const [reviews, setReviews] = useState<unknown[]>([]);
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const { token, user: currentUser } = useAuth();
 
@@ -62,7 +75,7 @@ export default function UserProfilePage() {
         await fetch(`http://localhost:8000/api/v1/users/${params.userId}/follow`, { method: "POST", headers: { Authorization: `Bearer ${token}` }});
         setIsFollowing(true);
       }
-    } catch (_e) {
+    } catch {
       alert("Lỗi khi theo dõi");
     }
   };

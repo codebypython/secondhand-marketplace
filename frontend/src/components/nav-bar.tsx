@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { useAuth } from "@/components/auth-provider";
+import { useAuth } from "@/lib/hooks/useAuth";
 import { SearchBox } from "@/components/search-box";
 
 export function NavBar() {

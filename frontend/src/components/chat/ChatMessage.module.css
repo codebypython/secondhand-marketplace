@@ -1,0 +1,33 @@
+.message {
+  max-width: 75%;
+  padding: 10px 12px;
+  border-radius: 12px;
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+
+.own {
+  margin-left: auto;
+  background: var(--color-peach);
+  color: var(--card-bg);
+  border-bottom-right-radius: 4px;
+}
+
+.other {
+  margin-right: auto;
+  background: rgba(255,255,255,0.08);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+
+.sender {
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  opacity: 0.9;
+}
+
+.time {
+  font-size: 11px;
+  opacity: 0.7;
+}

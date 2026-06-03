@@ -58,7 +58,7 @@ if (-not $NoFrontend) {
     if (-not (Test-Path "node_modules")) {
         npm install
     }
-    $frontendCmd = "Set-Location `"$PSScriptRoot\frontend`"; npm run dev -- -p $WebPort"
+    $frontendCmd = "Set-Location `"$PSScriptRoot\frontend`"; & `".\node_modules\.bin\next`" dev --port $WebPort"
     Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $frontendCmd | Out-Null
 }
 

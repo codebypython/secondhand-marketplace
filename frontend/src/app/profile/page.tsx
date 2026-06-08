@@ -8,8 +8,8 @@ import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
 import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
-import type { Listing } from "@/lib/types";
-import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
+import type { Listing, Wishlist } from "@/lib/types";
+import { conditionLabels, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
 
 export default function ProfilePage() {
   const { token, user, refreshUser } = useAuth();
@@ -34,6 +34,72 @@ export default function ProfilePage() {
     });
     return () => { active = false; };
   }, [user?.id]);
+
+  // Wishlists state
+  const [activeTab, setActiveTab] = useState<"listings" | "wishlists">("listings");
+  const [wishlists, setWishlists] = useState<Wishlist[]>([]);
+  const [wishlistsLoading, setWishlistsLoading] = useState(true);
+  const [newWishlistName, setNewWishlistName] = useState("");
+  const [wishlistItemsDetails, setWishlistItemsDetails] = useState<Record<string, Listing>>({});
+
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    void api.getWishlists(token).then(async (data) => {
+      if (!active) return;
+      setWishlists(data);
+      setWishlistsLoading(false);
+      
+      const itemDetails: Record<string, Listing> = {};
+      for (const wl of data) {
+        for (const item of wl.items) {
+          try {
+            const detail = await api.getListing(item.listing_id);
+            itemDetails[item.listing_id] = detail;
+          } catch (e) {
+            console.error("Failed to load listing detail in wishlist", e);
+          }
+        }
+      }
+      if (active) {
+        setWishlistItemsDetails(itemDetails);
+      }
+    });
+    return () => { active = false; };
+  }, [token]);
+
+  const handleCreateWishlist = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token || !newWishlistName.trim()) return;
+    try {
+      const wl = await api.createWishlist(token, { name: newWishlistName });
+      setWishlists([wl, ...wishlists]);
+      setNewWishlistName("");
+      showToast("Tạo danh sách ước thành công!", "success");
+    } catch (err) {
+      showToast("Lỗi khi tạo danh sách ước", "danger");
+    }
+  };
+
+  const handleRemoveFromWishlist = async (wishlistId: string, listingId: string) => {
+    if (!token) return;
+    try {
+      await api.removeWishlistItem(token, wishlistId, listingId);
+      showToast("Đã xóa sản phẩm khỏi danh sách ước.", "success");
+      setWishlists(prev => prev.map(wl => {
+        if (wl.id === wishlistId) {
+          return {
+            ...wl,
+            items: wl.items.filter((item: any) => item.listing_id !== listingId)
+          };
+        }
+        return wl;
+      }));
+    } catch (err) {
+      showToast("Lỗi khi xóa sản phẩm", "danger");
+    }
+  };
+
 
   if (!token || !user) {
     return (
@@ -191,43 +257,136 @@ export default function ProfilePage() {
           </form>
         </div>
 
-        {/* Right: My listings */}
+        {/* Right: Tabs and content lists */}
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div className="split">
-            <h2 style={{ fontSize: 17, fontWeight: 600 }}>📦 Sản phẩm của tôi</h2>
-            <Link className="button ghost sm" href="/listings/new">＋ Đăng tin mới</Link>
+          <div style={{ display: "flex", gap: 16, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
+            <button 
+              type="button"
+              onClick={() => setActiveTab("listings")}
+              style={{ background: "none", border: "none", padding: "8px 16px", cursor: "pointer", fontWeight: activeTab === "listings" ? 600 : 400, color: activeTab === "listings" ? "var(--accent)" : "var(--text)", borderBottom: activeTab === "listings" ? "2px solid var(--accent)" : "2px solid transparent", marginBottom: -11 }}
+            >
+              Sản phẩm của tôi ({myListings.length})
+            </button>
+            <button 
+              type="button"
+              onClick={() => setActiveTab("wishlists")}
+              style={{ background: "none", border: "none", padding: "8px 16px", cursor: "pointer", fontWeight: activeTab === "wishlists" ? 600 : 400, color: activeTab === "wishlists" ? "var(--accent)" : "var(--text)", borderBottom: activeTab === "wishlists" ? "2px solid var(--accent)" : "2px solid transparent", marginBottom: -11 }}
+            >
+              Danh sách ước ({wishlists.length})
+            </button>
           </div>
 
-          {listingsLoading ? (
-            <div className="grid" style={{ gap: 12 }}>{[1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 80 }} />)}</div>
-          ) : myListings.length === 0 ? (
-            <div className="empty-state panel">
-              <div className="empty-icon">📝</div>
-              <h3>Chưa có tin đăng nào</h3>
-              <p>Bắt đầu bán đồ bằng cách đăng tin mới.</p>
-              <Link className="button primary" href="/listings/new" style={{ marginTop: 12 }}>＋ Đăng tin ngay</Link>
-            </div>
+          {activeTab === "listings" ? (
+            <>
+              <div className="split">
+                <h2 style={{ fontSize: 17, fontWeight: 600 }}>📦 Sản phẩm của tôi</h2>
+                <Link className="button ghost sm" href="/listings/new">＋ Đăng tin mới</Link>
+              </div>
+
+              {listingsLoading ? (
+                <div className="grid" style={{ gap: 12 }}>{[1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 80 }} />)}</div>
+              ) : myListings.length === 0 ? (
+                <div className="empty-state panel">
+                  <div className="empty-icon">📝</div>
+                  <h3>Chưa có tin đăng nào</h3>
+                  <p>Bắt đầu bán đồ bằng cách đăng tin mới.</p>
+                  <Link className="button primary" href="/listings/new" style={{ marginTop: 12 }}>＋ Đăng tin ngay</Link>
+                </div>
+              ) : (
+                <div className="grid" style={{ gap: 10 }}>
+                  {myListings.map((listing) => {
+                    const statusCls = listing.status === "AVAILABLE" ? "badge-success" : listing.status === "SOLD" ? "badge-danger" : "badge-warning";
+                    return (
+                      <div className="list-item" key={listing.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div className="split">
+                          <Link href={`/listings/${listing.id}`} style={{ fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
+                            {listing.title}
+                          </Link>
+                          <span className={`badge ${statusCls}`}>{statusLabels[listing.status] ?? listing.status}</span>
+                        </div>
+                        <div className="inline">
+                          <span className="badge">{conditionLabels[listing.condition] ?? listing.condition}</span>
+                          <span className="price-sm">{formatPrice(listing.price)} ₫</span>
+                          <span className="muted" style={{ fontSize: 11, marginLeft: "auto" }}>{timeAgo(listing.created_at)}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           ) : (
-            <div className="grid" style={{ gap: 10 }}>
-              {myListings.map((listing) => {
-                const statusCls = listing.status === "AVAILABLE" ? "badge-success" : listing.status === "SOLD" ? "badge-danger" : "badge-warning";
-                return (
-                  <div className="list-item" key={listing.id} style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <div className="split">
-                      <Link href={`/listings/${listing.id}`} style={{ fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
-                        {listing.title}
-                      </Link>
-                      <span className={`badge ${statusCls}`}>{statusLabels[listing.status] ?? listing.status}</span>
+            <>
+              <div className="split">
+                <h2 style={{ fontSize: 17, fontWeight: 600 }}>⭐ Danh sách ước (Wishlists)</h2>
+              </div>
+
+              {/* Form to create new wishlist */}
+              <form onSubmit={handleCreateWishlist} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+                <input 
+                  placeholder="Tên danh sách mới... (VD: Đồ điện tử muốn mua)" 
+                  value={newWishlistName}
+                  onChange={e => setNewWishlistName(e.target.value)}
+                  style={{ flex: 1, padding: "8px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text)", fontSize: 13 }}
+                  required
+                />
+                <button type="submit" className="button primary sm" style={{ padding: "8px 16px" }}>Tạo mới</button>
+              </form>
+
+              {wishlistsLoading ? (
+                <div className="skeleton" style={{ height: 100 }} />
+              ) : wishlists.length === 0 ? (
+                <div className="empty-state panel">
+                  <div className="empty-icon">📁</div>
+                  <h3>Chưa có danh sách ước nào</h3>
+                  <p>Hãy tạo danh sách mới ở trên hoặc lưu trực tiếp từ trang chi tiết sản phẩm.</p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                  {wishlists.map(wl => (
+                    <div key={wl.id} className="panel" style={{ display: "flex", flexDirection: "column", gap: 12, border: "1px solid var(--border)", padding: 16 }}>
+                      <div className="split">
+                        <strong style={{ fontSize: 15 }}>📁 {wl.name}</strong>
+                        <span className="muted" style={{ fontSize: 12 }}>{wl.items.length} sản phẩm</span>
+                      </div>
+                      
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {wl.items.map((item: any) => {
+                          const details = wishlistItemsDetails[item.listing_id];
+                          return (
+                            <div key={item.id} className="list-item" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 12px", background: "var(--bg-inset)" }}>
+                              {details ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                                  <Link href={`/listings/${details.id}`} style={{ fontWeight: 600, fontSize: 14, color: "var(--text)" }}>
+                                    {details.title}
+                                  </Link>
+                                  <span className="price-sm">{formatPrice(details.price)} ₫</span>
+                                </div>
+                              ) : (
+                                <span className="muted" style={{ fontSize: 13 }}>Đang tải...</span>
+                              )}
+                              <button 
+                                type="button" 
+                                className="button danger ghost sm" 
+                                onClick={() => handleRemoveFromWishlist(wl.id, item.listing_id)}
+                                style={{ padding: "4px 8px" }}
+                              >
+                                Xóa
+                              </button>
+                            </div>
+                          );
+                        })}
+                        {wl.items.length === 0 && (
+                          <div className="muted" style={{ fontSize: 12, padding: "8px 0", textAlign: "center" }}>
+                            Không có sản phẩm nào trong danh sách này.
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="inline">
-                      <span className="badge">{conditionLabels[listing.condition] ?? listing.condition}</span>
-                      <span className="price-sm">{formatPrice(listing.price)} ₫</span>
-                      <span className="muted" style={{ fontSize: 11, marginLeft: "auto" }}>{timeAgo(listing.created_at)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
+import { api } from "@/lib/api";
 
 export function SearchBox() {
   const router = useRouter();
@@ -25,12 +26,8 @@ export function SearchBox() {
     const fetchSuggestions = async () => {
       if (query.trim().length >= 2) {
         try {
-          // Fallback to fetch if api doesn't expose it directly yet
-          const res = await fetch(`http://localhost:8000/api/v1/listings/search/suggestions?query=${encodeURIComponent(query)}`);
-          if (res.ok) {
-            const data = await res.json();
-            setSuggestions(data);
-          }
+          const data = await api.searchSuggestions(query);
+          setSuggestions(data);
         } catch (e) {
           console.error("Error fetching suggestions", e);
         }

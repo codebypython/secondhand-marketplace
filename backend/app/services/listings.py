@@ -7,11 +7,29 @@ from app.models.user import User
 from app.schemas.listing import CategoryCreate, ListingCreate, ListingUpdate
 
 
+def check_category_cycle(session: Session, parent_id: str | None, current_id: str | None = None) -> None:
+    """Walk up the parent chain to detect circular references in category hierarchy."""
+    if parent_id is None:
+        return
+    visited: set[str] = set()
+    temp_id = parent_id
+    while temp_id:
+        if current_id and temp_id == current_id:
+            raise ValueError("Tạo danh mục bị lặp vòng tuần hoàn (Category cycle detected)!")
+        if temp_id in visited:
+            break  # already-existing cycle in data, stop walking
+        visited.add(temp_id)
+        parent = session.get(Category, temp_id)
+        temp_id = parent.parent_id if parent else None
+
+
 def list_categories(session: Session) -> list[Category]:
     return list(session.scalars(select(Category).order_by(Category.name.asc())))
 
 
 def create_category(session: Session, payload: CategoryCreate) -> Category:
+    if payload.parent_id:
+        check_category_cycle(session, payload.parent_id)
     category = Category(name=payload.name, parent_id=payload.parent_id, slug=payload.slug, image_url=payload.image_url)
     session.add(category)
     session.commit()

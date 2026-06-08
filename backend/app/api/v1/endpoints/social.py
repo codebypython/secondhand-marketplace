@@ -1,19 +1,24 @@
 from typing import Any
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.api.deps import get_current_user
 from app.db.session import get_db_session
-from app.models.user import User
 from app.models.listing import Listing
-from app.models.social import UserFollow, Review, Wishlist, WishlistItem, ListingQuestion
-from app.schemas.user import UserPublicRead
+from app.models.social import ListingQuestion, Review, UserFollow, Wishlist, WishlistItem
+from app.models.user import User
 from app.schemas.social import (
-    ReviewCreate, ReviewRead, 
-    WishlistCreate, WishlistRead,
-    QuestionCreate, AnswerCreate, QuestionRead
+    AnswerCreate,
+    QuestionCreate,
+    QuestionRead,
+    ReviewCreate,
+    ReviewRead,
+    WishlistCreate,
+    WishlistRead,
+    WishlistItemRead,
 )
 
 router = APIRouter()
@@ -74,9 +79,37 @@ def create_review(
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
         
+    from app.models.enums import DealStatus
+    from app.models.transaction import Deal
+    
+    deal = session.get(Deal, payload.deal_id)
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal not found")
+    if deal.status != DealStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Cannot review a deal that is not completed")
+        
+    # Verify participant roles
+    if current_user.id not in {deal.buyer_id, deal.seller_id}:
+        raise HTTPException(status_code=403, detail="You are not a participant in this deal")
+        
+    expected_target_id = deal.seller_id if current_user.id == deal.buyer_id else deal.buyer_id
+    if user_id != expected_target_id:
+        raise HTTPException(status_code=400, detail="Target user is not the other participant in this deal")
+        
+    # Check for duplicate reviews for this deal
+    existing_review = session.scalar(
+        select(Review).where(
+            Review.deal_id == payload.deal_id,
+            Review.reviewer_id == current_user.id
+        )
+     )
+    if existing_review:
+        raise HTTPException(status_code=400, detail="You have already reviewed this transaction")
+        
     review = Review(
         reviewer_id=current_user.id,
         target_id=user_id,
+        deal_id=payload.deal_id,
         rating=payload.rating,
         comment=payload.comment
     )
@@ -127,6 +160,69 @@ def get_my_wishlists(
         .order_by(Wishlist.created_at.desc())
     )
     return list(session.scalars(stmt))
+
+
+@router.post("/wishlists/{wishlist_id}/items", response_model=WishlistItemRead, status_code=201)
+def add_wishlist_item(
+    wishlist_id: UUID,
+    payload: dict,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    wishlist = session.get(Wishlist, wishlist_id)
+    if not wishlist:
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+    if wishlist.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this wishlist")
+        
+    listing_id = payload.get("listing_id")
+    if not listing_id:
+        raise HTTPException(status_code=400, detail="listing_id is required")
+        
+    listing_uuid = UUID(listing_id) if isinstance(listing_id, str) else listing_id
+    listing = session.get(Listing, listing_uuid)
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found")
+        
+    existing = session.scalar(
+        select(WishlistItem).where(
+            WishlistItem.wishlist_id == wishlist_id,
+            WishlistItem.listing_id == listing_uuid
+        )
+    )
+    if existing:
+        return existing
+        
+    item = WishlistItem(wishlist_id=wishlist_id, listing_id=listing_uuid)
+    session.add(item)
+    session.commit()
+    session.refresh(item)
+    return item
+
+
+@router.delete("/wishlists/{wishlist_id}/items/{listing_id}", status_code=204)
+def remove_wishlist_item(
+    wishlist_id: UUID,
+    listing_id: UUID,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    wishlist = session.get(Wishlist, wishlist_id)
+    if not wishlist:
+        raise HTTPException(status_code=404, detail="Wishlist not found")
+    if wishlist.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to edit this wishlist")
+        
+    item = session.scalar(
+        select(WishlistItem).where(
+            WishlistItem.wishlist_id == wishlist_id,
+            WishlistItem.listing_id == listing_id
+        )
+    )
+    if item:
+        session.delete(item)
+        session.commit()
+
 
 # Listing Q&A
 @router.post("/listings/{listing_id}/questions", response_model=QuestionRead, status_code=201)

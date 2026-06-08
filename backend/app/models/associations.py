@@ -22,3 +22,15 @@ conversation_participant = Table(
     ),
     Column("user_id", UUIDSqlType, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
 )
+
+# Per-user message deletion tracking.
+# Instead of globally soft-deleting a message (hiding it for both parties),
+# this table records which user has deleted which message from their view only.
+message_deleted_for = Table(
+    "message_deleted_for",
+    Base.metadata,
+    Column("message_id", UUIDSqlType, ForeignKey("messages.id", ondelete="CASCADE"), primary_key=True),
+    Column("user_id", UUIDSqlType, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    UniqueConstraint("message_id", "user_id", name="uq_message_deleted_for_user"),
+)
+

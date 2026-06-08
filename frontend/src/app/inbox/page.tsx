@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mail, Plus, X, MessageCircle } from "lucide-react";
+import { Plus, X, MessageCircle } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -53,12 +53,18 @@ export default function InboxPage() {
   // Auto-refresh messages every 5 seconds
   useEffect(() => {
     if (!token || !selectedId) return;
-    const interval = setInterval(() => {
+    let active = true;
+    const poll = () => {
       void api.getConversation(token, selectedId).then((conv) => {
+        if (!active) return;
         setConversations((prev) => prev.map((c) => c.id === conv.id ? conv : c));
+        setTimeout(poll, 5000);
+      }).catch(() => {
+        if (active) setTimeout(poll, 10000); // Back off on error
       });
-    }, 5000);
-    return () => clearInterval(interval);
+    };
+    const timerId = setTimeout(poll, 5000);
+    return () => { active = false; clearTimeout(timerId); };
   }, [token, selectedId]);
 
   if (!token) {
@@ -91,6 +97,20 @@ export default function InboxPage() {
       showToast(err instanceof Error ? err.message : "Không thể gửi tin nhắn.", "danger");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!window.confirm("Bạn có muốn thu hồi tin nhắn này không?")) return;
+    try {
+      await api.deleteMessage(token, messageId);
+      showToast("Đã thu hồi tin nhắn.", "success");
+      if (selectedId) {
+        const updated = await api.getConversation(token, selectedId);
+        setConversations((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Không thể thu hồi tin nhắn.", "danger");
     }
   };
 
@@ -266,8 +286,31 @@ export default function InboxPage() {
                                 {getInitials(msg.sender?.profile?.full_name, msg.sender?.email?.[0]?.toUpperCase())}
                               </div>
                             ) : !isSent ? <div style={{ width: 28 }} /> : null}
-                            <div>
-                              <div className={`message-bubble ${isSent ? "sent" : "received"}`}>{msg.content}</div>
+                            <div style={{ display: "flex", flexDirection: "column", alignItems: isSent ? "flex-end" : "flex-start" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {isSent && msg.content !== "Tin nhắn đã bị thu hồi" && (
+                                  <button
+                                    title="Thu hồi tin nhắn"
+                                    onClick={() => handleDeleteMessage(msg.id)}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      color: "var(--text-tertiary)",
+                                      cursor: "pointer",
+                                      fontSize: 12,
+                                      opacity: 0.5,
+                                      padding: 2,
+                                    }}
+                                    onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
+                                    onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
+                                  >
+                                    🗑️
+                                  </button>
+                                )}
+                                <div className={`message-bubble ${isSent ? "sent" : "received"}`} style={{ fontStyle: msg.content === "Tin nhắn đã bị thu hồi" ? "italic" : "normal", color: msg.content === "Tin nhắn đã bị thu hồi" ? "var(--text-tertiary)" : "inherit" }}>
+                                  {msg.content}
+                                </div>
+                              </div>
                               <div className="message-meta" style={{ textAlign: isSent ? "right" : "left", paddingLeft: 4, paddingRight: 4 }}>
                                 {new Date(msg.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
                               </div>

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [switch]$NoDocker,
     [switch]$NoMigrate,
     [switch]$NoFrontend,

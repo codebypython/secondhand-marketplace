@@ -10,12 +10,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 from app.models.associations import user_favorite_listing
 from app.models.enums import ItemCondition, ListingStatus
-from app.models.mixins import JSONBSqlType, SoftDeleteMixin, TimestampMixin, UUIDMixin
+from app.models.mixins import JSONBSqlType, SoftDeleteMixin, TimestampMixin, UUIDMixin, VersionMixin
 
 if TYPE_CHECKING:
+    from app.models.social import ListingQuestion
     from app.models.transaction import Deal, Offer
     from app.models.user import User
-    from app.models.social import ListingQuestion
 
 
 class Category(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -31,7 +31,7 @@ class Category(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     listings: Mapped[list[Listing]] = relationship(back_populates="category")
 
 
-class Listing(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
+class Listing(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, VersionMixin):
     __tablename__ = "listings"
     __table_args__ = (CheckConstraint("price >= 0", name="listing_price_non_negative"),)
 

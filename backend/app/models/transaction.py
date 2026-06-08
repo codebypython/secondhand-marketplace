@@ -10,14 +10,14 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.enums import DealStatus, DeliveryStatus, MeetupStatus, OfferStatus
-from app.models.mixins import JSONBSqlType, TimestampMixin, UUIDMixin
+from app.models.mixins import JSONBSqlType, TimestampMixin, UUIDMixin, VersionMixin
 
 if TYPE_CHECKING:
     from app.models.listing import Listing
     from app.models.user import User
 
 
-class Offer(Base, UUIDMixin, TimestampMixin):
+class Offer(Base, UUIDMixin, TimestampMixin, VersionMixin):
     __tablename__ = "offers"
     __table_args__ = (CheckConstraint("price >= 0", name="offer_price_non_negative"),)
 
@@ -75,7 +75,7 @@ class Offer(Base, UUIDMixin, TimestampMixin):
         self.status = OfferStatus.CANCELLED
 
 
-class Deal(Base, UUIDMixin, TimestampMixin):
+class Deal(Base, UUIDMixin, TimestampMixin, VersionMixin):
     __tablename__ = "deals"
     __table_args__ = (CheckConstraint("agreed_price >= 0", name="deal_price_non_negative"),)
 

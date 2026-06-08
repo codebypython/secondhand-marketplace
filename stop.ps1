@@ -1,4 +1,4 @@
-param([switch]$KeepDocker)
+﻿param([switch]$KeepDocker)
 
 $ErrorActionPreference = "SilentlyContinue"
 Set-Location $PSScriptRoot

@@ -145,3 +145,40 @@ export interface AuthResponse {
   token_type: string;
   user: User;
 }
+
+export interface ListingQuestion {
+  id: string;
+  listing_id: string;
+  asker_id?: string | null;
+  question: string;
+  answer?: string | null;
+  created_at: string;
+  updated_at: string;
+  asker?: UserPublic | null;
+}
+
+export interface Review {
+  id: string;
+  reviewer_id?: string | null;
+  target_id: string;
+  deal_id?: string | null;
+  rating: number;
+  comment?: string | null;
+  created_at: string;
+  reviewer?: UserPublic | null;
+}
+
+export interface WishlistItem {
+  id: string;
+  listing_id: string;
+  created_at: string;
+}
+
+export interface Wishlist {
+  id: string;
+  name: string;
+  is_public: boolean;
+  created_at: string;
+  items: WishlistItem[];
+}
+

@@ -7,24 +7,32 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db_session
 from app.models.user import User
-from app.schemas.transaction import DealRead, MeetupCreate, MeetupRead, OfferCreate, OfferRead
+from app.schemas.transaction import (
+    CounterOfferCreate,
+    DealDeliveryUpdate,
+    DealDisputeCreate,
+    DealRead,
+    MeetupCreate,
+    MeetupRead,
+    OfferCreate,
+    OfferRead,
+)
 from app.services.transactions import (
     accept_offer,
     cancel_deal,
     cancel_offer,
+    check_in_meetup,
     complete_deal,
+    counter_offer,
     create_offer,
     decline_offer,
+    file_dispute,
     list_owner_offers,
     list_user_deals,
     list_user_offers,
     schedule_meetup,
-    counter_offer,
     update_delivery_status,
-    file_dispute,
-    check_in_meetup,
 )
-from app.schemas.transaction import CounterOfferCreate, DealDeliveryUpdate, DealDisputeCreate
 
 router = APIRouter()
 
@@ -67,7 +75,7 @@ def received_offers(session: Session = Depends(get_db_session), current_user: Us
     return [_offer_to_read(o) for o in list_owner_offers(session, current_user)]
 
 
-@router.post("/offers/{offer_id}/counter", response_model=OfferRead)
+@router.post("/offers/{offer_id}/counter", response_model=OfferRead, status_code=status.HTTP_201_CREATED)
 def counter_offer_endpoint(
     offer_id: UUID,
     payload: CounterOfferCreate,

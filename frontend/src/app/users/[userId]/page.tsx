@@ -32,7 +32,12 @@ export default function UserProfilePage() {
   const [activeTab, setActiveTab] = useState<"listings" | "reviews">("listings");
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { token, user: currentUser } = useAuth();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -56,9 +61,7 @@ export default function UserProfilePage() {
     );
     // Load reviews
     if (token) {
-      fetch(`http://localhost:8000/api/v1/users/${params.userId}/reviews`, {
-        headers: { Authorization: `Bearer ${token}` }
-      }).then(res => res.json()).then(data => {
+      api.getUserReviews(params.userId, token).then(data => {
         if (active && Array.isArray(data)) setReviews(data);
       }).catch(() => {});
     }
@@ -69,10 +72,10 @@ export default function UserProfilePage() {
     if (!token) return alert("Vui lòng đăng nhập để theo dõi");
     try {
       if (isFollowing) {
-        await fetch(`http://localhost:8000/api/v1/users/${params.userId}/follow`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` }});
+        await api.unfollowUser(token, params.userId);
         setIsFollowing(false);
       } else {
-        await fetch(`http://localhost:8000/api/v1/users/${params.userId}/follow`, { method: "POST", headers: { Authorization: `Bearer ${token}` }});
+        await api.followUser(token, params.userId);
         setIsFollowing(true);
       }
     } catch {
@@ -158,7 +161,7 @@ export default function UserProfilePage() {
           <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
             <div className="split">
               <span className="muted" style={{ fontSize: 13 }}>Tham gia</span>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>{formatDate(userProfile.created_at)}</span>
+              <span style={{ fontSize: 13, fontWeight: 500 }}>{mounted ? formatDate(userProfile.created_at) : "..."}</span>
             </div>
             <div className="split">
               <span className="muted" style={{ fontSize: 13 }}>Đang bán</span>
@@ -213,7 +216,7 @@ export default function UserProfilePage() {
                       <h3 className="truncate">{listing.title}</h3>
                       <p className="muted truncate" style={{ fontSize: 13 }}>{listing.description ?? "Không có mô tả"}</p>
                       <div className="price-sm">{formatPrice(listing.price)} ₫</div>
-                      <div className="muted" style={{ fontSize: 12 }}>{timeAgo(listing.created_at)}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>{mounted ? timeAgo(listing.created_at) : "..."}</div>
                       <div className="card-actions">
                         <Link className="button secondary sm" href={`/listings/${listing.id}`}>
                           Xem chi tiết →

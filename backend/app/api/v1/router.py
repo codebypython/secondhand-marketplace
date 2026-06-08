@@ -1,6 +1,15 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, chat, health, listings, moderation, transactions, users, social
+from app.api.v1.endpoints import (
+    auth,
+    chat,
+    health,
+    listings,
+    moderation,
+    social,
+    transactions,
+    users,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])

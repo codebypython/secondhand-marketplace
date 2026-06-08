@@ -1,13 +1,29 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.enums import DealStatus, OfferStatus, DeliveryStatus, MeetupStatus
+from app.models.enums import DealStatus, MeetupStatus, OfferStatus
 from app.models.listing import Listing
 from app.models.transaction import Deal, Meetup, Offer
 from app.models.user import User
-from app.schemas.transaction import MeetupCreate, OfferCreate, CounterOfferCreate, DealDeliveryUpdate, DealDisputeCreate
+from app.schemas.transaction import (
+    CounterOfferCreate,
+    DealDeliveryUpdate,
+    DealDisputeCreate,
+    MeetupCreate,
+    OfferCreate,
+)
 from app.services.moderation import ensure_not_blocked
+from app.events import (
+    DealCancelledEvent,
+    DealCompletedEvent,
+    MeetupCompletedEvent,
+    OfferAcceptedEvent,
+    OfferCounteredEvent,
+    OfferDeclinedEvent,
+    event_bus,
+)
 
 
 def create_offer(session: Session, buyer: User, payload: OfferCreate) -> Offer:
@@ -57,6 +73,12 @@ def counter_offer(session: Session, actor: User, parent_offer_id, payload: Count
     session.add(new_offer)
     session.commit()
     session.refresh(new_offer)
+    event_bus.publish(OfferCounteredEvent(data={
+        "parent_offer_id": str(parent_offer.id),
+        "new_offer_id": str(new_offer.id),
+        "price": str(new_offer.price),
+        "listing_id": str(parent_offer.listing_id),
+    }))
     return new_offer
 
 def _expire_offers_if_needed(session: Session, offers: list[Offer]):
@@ -130,6 +152,14 @@ def accept_offer(session: Session, actor: User, offer_id) -> Deal:
 
     session.commit()
     session.refresh(deal)
+    event_bus.publish(OfferAcceptedEvent(data={
+        "offer_id": str(offer.id),
+        "deal_id": str(deal.id),
+        "buyer_id": str(offer.buyer_id),
+        "seller_id": str(offer.listing.owner_id),
+        "listing_id": str(offer.listing_id),
+        "agreed_price": str(deal.agreed_price),
+    }))
     return deal
 
 
@@ -141,6 +171,10 @@ def decline_offer(session: Session, actor: User, offer_id) -> Offer:
     session.add(offer)
     session.commit()
     session.refresh(offer)
+    event_bus.publish(OfferDeclinedEvent(data={
+        "offer_id": str(offer.id),
+        "listing_id": str(offer.listing_id),
+    }))
     return offer
 
 
@@ -180,7 +214,14 @@ def complete_deal(session: Session, actor: User, deal_id) -> Deal:
     deal.complete(deal.listing)
     session.add_all([deal, deal.listing])
     session.commit()
-    return get_deal_or_error(session, deal.id)
+    result = get_deal_or_error(session, deal.id)
+    event_bus.publish(DealCompletedEvent(data={
+        "deal_id": str(deal.id),
+        "listing_id": str(deal.listing_id),
+        "buyer_id": str(deal.buyer_id),
+        "seller_id": str(deal.seller_id),
+    }))
+    return result
 
 
 def cancel_deal(session: Session, actor: User, deal_id) -> Deal:
@@ -190,7 +231,12 @@ def cancel_deal(session: Session, actor: User, deal_id) -> Deal:
     deal.cancel(deal.listing)
     session.add_all([deal, deal.listing])
     session.commit()
-    return get_deal_or_error(session, deal.id)
+    result = get_deal_or_error(session, deal.id)
+    event_bus.publish(DealCancelledEvent(data={
+        "deal_id": str(deal.id),
+        "listing_id": str(deal.listing_id),
+    }))
+    return result
 
 def update_delivery_status(session: Session, actor: User, deal_id: str, payload: DealDeliveryUpdate) -> Deal:
     deal = get_deal_or_error(session, deal_id)
@@ -260,4 +306,9 @@ def check_in_meetup(session: Session, actor: User, meetup_id: str) -> Meetup:
     session.add_all([meetup, deal])
     session.commit()
     session.refresh(meetup)
+    if meetup.status == MeetupStatus.COMPLETED:
+        event_bus.publish(MeetupCompletedEvent(data={
+            "meetup_id": str(meetup.id),
+            "deal_id": str(deal.id),
+        }))
     return meetup

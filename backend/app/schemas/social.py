@@ -1,12 +1,15 @@
 from datetime import datetime
 from uuid import UUID
+
 from pydantic import BaseModel, Field
 
 from app.schemas.common import ORMModel
 from app.schemas.user import UserPublicRead
 
+
 # Reviews
 class ReviewCreate(BaseModel):
+    deal_id: UUID
     rating: int = Field(ge=1, le=5)
     comment: str | None = Field(default=None, max_length=2000)
 

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from sqlalchemy import CheckConstraint, ForeignKey, Integer, String, Text, UniqueConstraint, Boolean
+
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.models.mixins import TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.listing import Listing
-    from app.models.transaction import Deal
+    from app.models.user import User
 
 class UserFollow(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "user_follows"
@@ -32,6 +32,9 @@ class Review(Base, UUIDMixin, TimestampMixin):
     
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
     comment: Mapped[str | None] = mapped_column(Text)
+
+    reviewer: Mapped[User] = relationship(foreign_keys=[reviewer_id], back_populates="reviews_given")
+    target: Mapped[User] = relationship(foreign_keys=[target_id], back_populates="reviews_received")
 
     __table_args__ = (
         CheckConstraint("rating >= 1 AND rating <= 5", name="ck_reviews_rating_range"),

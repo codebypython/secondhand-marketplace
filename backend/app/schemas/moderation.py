@@ -36,3 +36,8 @@ class BlockRead(ORMModel):
     blocker_id: UUID
     blocked_id: UUID
     created_at: datetime
+
+
+class DisputeResolve(BaseModel):
+    resolution: str = Field(..., description="Must be 'COMPLETED' or 'CANCELLED'")
+

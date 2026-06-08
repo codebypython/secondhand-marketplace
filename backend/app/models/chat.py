@@ -6,7 +6,7 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.associations import conversation_participant
+from app.models.associations import conversation_participant, message_deleted_for
 from app.models.mixins import SoftDeleteMixin, TimestampMixin, UUIDMixin
 
 if TYPE_CHECKING:
@@ -48,3 +48,7 @@ class Message(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
     sender: Mapped[User] = relationship(back_populates="messages")
+    deleted_by: Mapped[list[User]] = relationship(
+        secondary=message_deleted_for,
+        lazy="selectin",
+    )

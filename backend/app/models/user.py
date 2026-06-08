@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import TYPE_CHECKING
 
-from datetime import date
-from sqlalchemy import Date, Enum as SAEnum
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import Date, ForeignKey, String
+from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.db.base import Base
@@ -15,8 +15,8 @@ from app.models.mixins import JSONBSqlType, SoftDeleteMixin, TimestampMixin, UUI
 if TYPE_CHECKING:
     from app.models.chat import Conversation, Message
     from app.models.listing import Listing
+    from app.models.social import Review, UserFollow, Wishlist
     from app.models.transaction import Deal, Offer
-    from app.models.social import UserFollow, Review, Wishlist
 
 
 class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):

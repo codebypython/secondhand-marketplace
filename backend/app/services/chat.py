@@ -83,11 +83,18 @@ def send_message(session: Session, user: User, payload: MessageCreate) -> Messag
 
 
 def soft_delete_message(session: Session, user: User, message_id) -> None:
+    """Per-user message deletion: hides the message only for the requesting user."""
     message = session.get(Message, message_id)
     if not message:
         raise ValueError("Message not found")
-    if message.sender_id != user.id:
-        raise ValueError("Only the sender can delete a message")
-    message.soft_delete()
-    session.add(message)
-    session.commit()
+    # Any participant can delete a message from their own view
+    conversation = get_conversation_or_error(session, message.conversation_id)
+    participant_ids = {p.id for p in conversation.participants}
+    if user.id not in participant_ids:
+        raise ValueError("Only conversation participants can delete messages")
+    # Mark as deleted for this user only (idempotent)
+    if user not in message.deleted_by:
+        message.deleted_by.append(user)
+        session.add(message)
+        session.commit()
+

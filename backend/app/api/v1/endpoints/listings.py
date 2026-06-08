@@ -23,9 +23,9 @@ from app.services.listings import (
     get_listing_or_error,
     list_categories,
     list_listings,
+    restore_listing,
     toggle_favorite,
     update_listing,
-    restore_listing,
 )
 
 router = APIRouter()
@@ -52,6 +52,7 @@ def search_suggestions(
 ) -> Any:
     # A simple implementation: fetch distinct listing titles that match the query
     from sqlalchemy import select
+
     from app.models.listing import Listing
     
     stmt = select(Listing.title).where(Listing.title.ilike(f"%{query}%")).limit(10)
@@ -68,6 +69,7 @@ def get_deleted_listings(
     # We can use list_listings with a custom status or directly query
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
+
     from app.models.listing import Listing
     stmt = (
         select(Listing)

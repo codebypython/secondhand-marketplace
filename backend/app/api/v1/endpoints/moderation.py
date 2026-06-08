@@ -7,13 +7,24 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_admin_user, get_current_user
 from app.db.session import get_db_session
 from app.models.user import User
-from app.schemas.moderation import BlockCreate, BlockRead, ReportCreate, ReportRead, ReportReview
+from app.schemas.moderation import (
+    BlockCreate,
+    BlockRead,
+    DisputeResolve,
+    ReportCreate,
+    ReportRead,
+    ReportReview,
+)
+from app.schemas.transaction import DealRead
 from app.services.moderation import (
     block_user,
     create_report,
     list_blocks_for_user,
+    list_disputed_deals,
     list_reports,
+    resolve_dispute,
     review_report,
+    unblock_user,
 )
 
 router = APIRouter()
@@ -64,3 +75,37 @@ def block_user_endpoint(
 @router.get("/blocks", response_model=list[BlockRead])
 def list_blocks_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> Any:
     return list_blocks_for_user(session, current_user)
+
+
+@router.delete("/blocks/{blocked_id}", status_code=status.HTTP_204_NO_CONTENT)
+def unblock_user_endpoint(
+    blocked_id: UUID,
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    try:
+        unblock_user(session, current_user, str(blocked_id))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+
+@router.get("/disputes", response_model=list[DealRead])
+def list_disputes_endpoint(
+    session: Session = Depends(get_db_session),
+    admin: User = Depends(get_admin_user),
+) -> Any:
+    return list_disputed_deals(session)
+
+
+@router.post("/disputes/{deal_id}/resolve", response_model=DealRead)
+def resolve_dispute_endpoint(
+    deal_id: UUID,
+    payload: DisputeResolve,
+    session: Session = Depends(get_db_session),
+    admin: User = Depends(get_admin_user),
+) -> Any:
+    try:
+        return resolve_dispute(session, admin, deal_id, payload.resolution)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

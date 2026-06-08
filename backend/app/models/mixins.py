@@ -5,8 +5,27 @@ from sqlalchemy import JSON, DateTime, Integer, Uuid, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
 
-UUIDSqlType = PGUUID(as_uuid=True).with_variant(Uuid(as_uuid=True), "sqlite")
+
+class SafeUUID(TypeDecorator):
+    impl = PGUUID(as_uuid=True).with_variant(Uuid(as_uuid=True), "sqlite")
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, str):
+            try:
+                return uuid.UUID(value)
+            except ValueError:
+                return value
+        return value
+
+    def process_result_value(self, value, dialect):
+        return value
+
+UUIDSqlType = SafeUUID()
 JSONBSqlType = JSONB().with_variant(JSON(), "sqlite")
 
 

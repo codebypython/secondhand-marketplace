@@ -74,6 +74,11 @@ docker-compose exec backend alembic upgrade head
 docker-compose exec backend python seed_data.py
 ```
 
+> [!TIP]
+> Để cập nhật nhanh toàn bộ hệ thống cục bộ (database, thư viện/dependencies, docker, v.v.) theo phiên bản mới nhất, bạn có thể chạy script cập nhật tự động ở thư mục gốc:
+> - **Windows (PowerShell):** `.\update.ps1` (hoặc thêm các flag `-Pull -ResetDb` để kéo code và reset DB)
+> - **Linux/macOS/WSL (Bash):** `./update.sh` (hoặc thêm các flag `--pull --reset-db`)
+
 **Thông tin login demo:**
 ```
 Email: nguyenvana@gmail.com (hoặc các email khác trong seed_data.py)

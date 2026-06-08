@@ -1,4 +1,5 @@
-import type { AuthResponse, Block, Category, Conversation, Deal, Listing, Meetup, Offer, Report, User, UserPublic } from "@/lib/types";
+import type { AuthResponse, Block, Category, Conversation, Deal, Listing, Meetup, Offer, Report, User, UserPublic, ListingQuestion, Review, Wishlist } from "@/lib/types";
+
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
@@ -115,4 +116,48 @@ export const api = {
   blockUser: (token: string, blocked_id: string) =>
     request<Block>("/moderation/blocks", { method: "POST", body: JSON.stringify({ blocked_id }) }, token),
   listBlocks: (token: string) => request<Block[]>("/moderation/blocks", undefined, token),
+  unblockUser: (token: string, blockedId: string) =>
+    request<void>(`/moderation/blocks/${blockedId}`, { method: "DELETE" }, token),
+
+  // Chat delete message
+  deleteMessage: (token: string, messageId: string) =>
+    request<void>(`/chat/messages/${messageId}`, { method: "DELETE" }, token),
+
+  // Wishlists
+  getWishlists: (token: string) =>
+    request<Wishlist[]>("/wishlists/me", undefined, token),
+  createWishlist: (token: string, payload: { name: string; is_public?: boolean }) =>
+    request<Wishlist>("/wishlists", { method: "POST", body: JSON.stringify(payload) }, token),
+  addWishlistItem: (token: string, wishlistId: string, listingId: string) =>
+    request<any>(`/wishlists/${wishlistId}/items`, { method: "POST", body: JSON.stringify({ listing_id: listingId }) }, token),
+  removeWishlistItem: (token: string, wishlistId: string, listingId: string) =>
+    request<void>(`/wishlists/${wishlistId}/items/${listingId}`, { method: "DELETE" }, token),
+
+  // Listing Q&A
+  getListingQuestions: (listingId: string) => 
+    request<ListingQuestion[]>(`/listings/${listingId}/questions`),
+  askQuestion: (token: string, listingId: string, question: string) => 
+    request<ListingQuestion>(`/listings/${listingId}/questions`, { method: "POST", body: JSON.stringify({ question }) }, token),
+  answerQuestion: (token: string, questionId: string, answer: string) => 
+    request<ListingQuestion>(`/listings/questions/${questionId}/answer`, { method: "POST", body: JSON.stringify({ answer }) }, token),
+
+  // Social Follow & Reviews
+  followUser: (token: string, userId: string) =>
+    request<void>(`/users/${userId}/follow`, { method: "POST" }, token),
+  unfollowUser: (token: string, userId: string) =>
+    request<void>(`/users/${userId}/follow`, { method: "DELETE" }, token),
+  getUserReviews: (userId: string, token?: string) =>
+    request<Review[]>(`/users/${userId}/reviews`, undefined, token),
+  createReview: (token: string, userId: string, payload: { deal_id: string; rating: number; comment?: string | null }) =>
+    request<Review>(`/users/${userId}/reviews`, { method: "POST", body: JSON.stringify(payload) }, token),
+
+  // Search Suggestions
+  searchSuggestions: (query: string) =>
+    request<string[]>(`/listings/search/suggestions?query=${encodeURIComponent(query)}`),
+
+  // Disputes
+  listDisputes: (token: string) => 
+    request<Deal[]>("/moderation/disputes", undefined, token),
+  resolveDispute: (token: string, dealId: string, resolution: "COMPLETED" | "CANCELLED") =>
+    request<Deal>(`/moderation/disputes/${dealId}/resolve`, { method: "POST", body: JSON.stringify({ resolution }) }, token),
 };

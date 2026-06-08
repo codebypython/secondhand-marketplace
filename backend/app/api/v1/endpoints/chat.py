@@ -21,7 +21,11 @@ router = APIRouter()
 
 @router.get("/conversations", response_model=list[ConversationRead])
 def list_conversations_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> Any:
-    return list_conversations(session, current_user)
+    conversations = list_conversations(session, current_user)
+    # Filter messages that are deleted for the current user
+    for conv in conversations:
+        conv.messages = [msg for msg in conv.messages if current_user not in msg.deleted_by]
+    return conversations
 
 
 @router.post("/conversations", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
@@ -48,7 +52,11 @@ def get_conversation_endpoint(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if current_user.id not in {participant.id for participant in conversation.participants}:
         raise HTTPException(status_code=403, detail="You are not in this conversation")
+    
+    # Filter messages that are deleted for the current user
+    conversation.messages = [msg for msg in conversation.messages if current_user not in msg.deleted_by]
     return conversation
+
 
 
 @router.post("/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED)

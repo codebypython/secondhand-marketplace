@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { ShoppingBag, BarChart3, Handshake, CheckCircle, AlertTriangle } from "lucide-react";
+import { ShoppingBag, BarChart3, Handshake } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -38,6 +38,11 @@ export default function OffersDashboardPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Counter offer state
   const [counterOfferId, setCounterOfferId] = useState<string | null>(null);
@@ -53,6 +58,34 @@ export default function OffersDashboardPage() {
   const [meetupDealId, setMeetupDealId] = useState<string | null>(null);
   const [meetupDate, setMeetupDate] = useState("");
   const [meetupLocation, setMeetupLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
+
+  // Review states
+  const [reviewDealId, setReviewDealId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewedDeals, setReviewedDeals] = useState<Record<string, boolean>>({});
+
+  const handleCreateReview = async (deal: Deal) => {
+    if (!token) return;
+    setActionLoading(`review-${deal.id}`);
+    try {
+      const targetId = user?.id === deal.buyer_id ? deal.seller_id : deal.buyer_id;
+      await api.createReview(token, targetId, {
+        deal_id: deal.id,
+        rating: reviewRating,
+        comment: reviewComment || null
+      });
+      showToast("Đã gửi đánh giá thành công!", "success");
+      setReviewedDeals(prev => ({ ...prev, [deal.id]: true }));
+      setReviewDealId(null);
+      setReviewComment("");
+      setReviewRating(5);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Gửi đánh giá thất bại.", "danger");
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
   const reload = async () => {
     if (!token) return;
@@ -184,8 +217,12 @@ export default function OffersDashboardPage() {
               {offer.is_counter_from_seller && <span className="badge badge-info">Từ người bán</span>}
               {!offer.is_counter_from_seller && <span className="badge badge-info">Từ người mua</span>}
             </div>
-            <span className="muted" style={{ fontSize: 12 }}>Tạo lúc: {formatDateTime(offer.created_at)}</span>
-            {offer.expires_at && offer.status === "PENDING" && <span className="muted" style={{ fontSize: 12, color: "var(--danger)" }}>Hết hạn: {formatDateTime(offer.expires_at)}</span>}
+            {mounted && (
+              <>
+                <span className="muted" style={{ fontSize: 12 }}>Tạo lúc: {formatDateTime(offer.created_at)}</span>
+                {offer.expires_at && offer.status === "PENDING" && <span className="muted" style={{ fontSize: 12, color: "var(--danger)" }}>Hết hạn: {formatDateTime(offer.expires_at)}</span>}
+              </>
+            )}
           </div>
 
           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
@@ -299,7 +336,7 @@ export default function OffersDashboardPage() {
                         </div>
                       )}
                     </div>
-                    <span className="muted" style={{ fontSize: 12 }}>{timeAgo(deal.created_at)}</span>
+                    {mounted && <span className="muted" style={{ fontSize: 12 }}>{timeAgo(deal.created_at)}</span>}
                   </div>
 
                   {/* Progress tracker */}
@@ -328,7 +365,7 @@ export default function OffersDashboardPage() {
                         <div key={meetup.id} className="list-item" style={{ padding: 10, fontSize: 13 }}>
                           <div className="split">
                             <div className="inline">
-                              <span>📅 {formatDateTime(meetup.scheduled_at)}</span>
+                              {mounted && <span>📅 {formatDateTime(meetup.scheduled_at)}</span>}
                               {meetup.location?.address && <span>📍 {meetup.location.address}</span>}
                               <span className={`badge ${meetup.status === "SCHEDULED" ? "badge-warning" : meetup.status === "COMPLETED" ? "badge-success" : "badge-danger"}`} style={{ fontSize: 11 }}>
                                 {meetup.status === "SCHEDULED" ? "Đã hẹn" : meetup.status === "COMPLETED" ? "Đã gặp" : "Hủy"}
@@ -450,6 +487,71 @@ export default function OffersDashboardPage() {
                       </div>
                     </div>
                   ) : null}
+
+                  {deal.status === "COMPLETED" && (
+                    <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                      {!reviewedDeals[deal.id] ? (
+                        reviewDealId === deal.id ? (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, background: "var(--bg-inset)", borderRadius: "var(--radius)" }}>
+                            <h4 style={{ margin: 0, fontSize: 14 }}>Đánh giá giao dịch này</h4>
+                            <div className="field" style={{ marginBottom: 12 }}>
+                              <label style={{ fontSize: 12 }}>Đánh giá sao ({reviewRating} / 5)</label>
+                              <div style={{ display: "flex", gap: 6, fontSize: 24, cursor: "pointer", marginTop: 4 }}>
+                                {[1, 2, 3, 4, 5].map((star) => (
+                                  <span 
+                                    key={star} 
+                                    onClick={() => setReviewRating(star)}
+                                    style={{ color: star <= reviewRating ? "orange" : "var(--text-tertiary)" }}
+                                  >
+                                    ★
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                            <div className="field" style={{ marginBottom: 12 }}>
+                              <label style={{ fontSize: 12 }}>Nhận xét (tùy chọn)</label>
+                              <textarea
+                                className="input"
+                                rows={2}
+                                placeholder="Chia sẻ trải nghiệm giao dịch của bạn..."
+                                value={reviewComment}
+                                onChange={(e) => setReviewComment(e.target.value)}
+                                style={{ fontSize: 13, padding: 8, borderRadius: 6, border: "1px solid var(--border)", width: "100%" }}
+                              />
+                            </div>
+                            <div className="inline">
+                              <button 
+                                className="button primary sm" 
+                                type="button" 
+                                onClick={() => handleCreateReview(deal)}
+                                disabled={actionLoading === `review-${deal.id}`}
+                              >
+                                Gửi đánh giá
+                              </button>
+                              <button className="button ghost sm" type="button" onClick={() => setReviewDealId(null)}>Hủy</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button 
+                            className="button secondary sm" 
+                            type="button" 
+                            onClick={() => {
+                              setReviewDealId(deal.id);
+                              setReviewRating(5);
+                              setReviewComment("");
+                            }}
+                            style={{ alignSelf: "flex-start" }}
+                          >
+                            ⭐ Viết đánh giá giao dịch
+                          </button>
+                        )
+                      ) : (
+                        <div style={{ fontSize: 13, color: "var(--color-success)", fontWeight: 500 }}>
+                          ✓ Bạn đã hoàn tất đánh giá cho giao dịch này.
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

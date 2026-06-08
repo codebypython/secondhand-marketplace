@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import ReportStatus, UserRole
 from app.models.moderation import Block, Report
+from app.models.transaction import Deal
 from app.models.user import User
 from app.schemas.moderation import BlockCreate, ReportCreate, ReportReview
 
@@ -72,3 +73,53 @@ def block_user(session: Session, blocker: User, payload: BlockCreate) -> Block:
 
 def list_blocks_for_user(session: Session, user: User) -> list[Block]:
     return list(session.scalars(select(Block).where(Block.blocker_id == user.id)))
+
+
+def unblock_user(session: Session, blocker: User, blocked_id: str) -> None:
+    block = session.scalar(
+        select(Block).where(
+            Block.blocker_id == blocker.id,
+            Block.blocked_id == blocked_id,
+        )
+    )
+    if not block:
+        raise ValueError("Block record not found")
+    session.delete(block)
+    session.commit()
+
+
+
+def list_disputed_deals(session: Session) -> list[Deal]:
+    return list(session.scalars(select(Deal).where(Deal.has_dispute).order_by(Deal.updated_at.desc())))
+
+
+def resolve_dispute(session: Session, admin: User, deal_id, resolution: str) -> Deal:
+    if admin.role != UserRole.ADMIN:
+        raise ValueError("Admin access is required")
+        
+    from app.models.listing import Listing
+    
+    stmt = select(Deal).where(Deal.id == deal_id)
+    deal = session.scalar(stmt)
+    if not deal:
+        raise ValueError("Deal not found")
+    if not deal.has_dispute:
+        raise ValueError("Deal has no active dispute")
+        
+    listing = session.get(Listing, deal.listing_id)
+    if not listing:
+        raise ValueError("Associated listing not found")
+        
+    if resolution == "COMPLETED":
+        deal.complete(listing)
+    elif resolution == "CANCELLED":
+        deal.cancel(listing)
+    else:
+        raise ValueError("Invalid resolution value. Must be 'COMPLETED' or 'CANCELLED'")
+        
+    deal.has_dispute = False
+    session.add_all([deal, listing])
+    session.commit()
+    session.refresh(deal)
+    return deal
+

@@ -24,9 +24,25 @@ export default function ListingDetailPage() {
   const [reportReason, setReportReason] = useState("");
   const [favorited, setFavorited] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
+  const [mounted, setMounted] = useState(false);
   const [questions, setQuestions] = useState<any[]>([]);
   const [newQuestion, setNewQuestion] = useState("");
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
+  const [wishlists, setWishlists] = useState<any[]>([]);
+  const [showWishlistSelector, setShowWishlistSelector] = useState(false);
+  const [newWishlistName, setNewWishlistName] = useState("");
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (token) {
+      api.getWishlists(token).then((data) => {
+        if (Array.isArray(data)) setWishlists(data);
+      }).catch(() => {});
+    }
+  }, [token]);
 
   useEffect(() => {
     let active = true;
@@ -44,7 +60,7 @@ export default function ListingDetailPage() {
         }
         
         // Load questions
-        fetch(`http://localhost:8000/api/v1/listings/${params.listingId}/questions`).then(res => res.json()).then(data => {
+        api.getListingQuestions(params.listingId).then(data => {
             if (active && Array.isArray(data)) setQuestions(data);
         }).catch(() => {});
         
@@ -58,17 +74,10 @@ export default function ListingDetailPage() {
     if (!token) return showToast("Vui lòng đăng nhập để gửi câu hỏi", "default");
     if (!newQuestion.trim()) return;
     try {
-        const res = await fetch(`http://localhost:8000/api/v1/listings/${params.listingId}/questions`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ question: newQuestion })
-        });
-        if (res.ok) {
-            const data = await res.json();
-            setQuestions([data, ...questions]);
-            setNewQuestion("");
-            showToast("Đã gửi câu hỏi", "success");
-        }
+        const data = await api.askQuestion(token, params.listingId, newQuestion);
+        setQuestions([data, ...questions]);
+        setNewQuestion("");
+        showToast("Đã gửi câu hỏi", "success");
     } catch {
         showToast("Lỗi khi gửi câu hỏi", "danger");
     }
@@ -76,19 +85,13 @@ export default function ListingDetailPage() {
 
   const handleAnswerQuestion = async (questionId: string) => {
     const text = replyText[questionId];
+    if (!token) return showToast("Vui lòng đăng nhập để trả lời câu hỏi", "default");
     if (!text || !text.trim()) return;
     try {
-        const res = await fetch(`http://localhost:8000/api/v1/listings/questions/${questionId}/answer`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-            body: JSON.stringify({ answer: text })
-        });
-        if (res.ok) {
-            const data = await res.json();
-            setQuestions(questions.map(q => q.id === questionId ? data : q));
-            setReplyText({ ...replyText, [questionId]: "" });
-            showToast("Đã trả lời câu hỏi", "success");
-        }
+        const data = await api.answerQuestion(token, questionId, text);
+        setQuestions(questions.map(q => q.id === questionId ? data : q));
+        setReplyText({ ...replyText, [questionId]: "" });
+        showToast("Đã trả lời câu hỏi", "success");
     } catch {
         showToast("Lỗi khi trả lời", "danger");
     }
@@ -137,6 +140,46 @@ export default function ListingDetailPage() {
       setShowReport(false);
       setReportReason("");
     } catch (err) { showToast(err instanceof Error ? err.message : "Lỗi.", "danger"); }
+  };
+
+  const handleDeleteListing = async () => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa tin đăng này?")) return;
+    setActionLoading(true);
+    try {
+      await api.deleteListing(token!, listing!.id);
+      showToast("Đã xóa tin đăng thành công!", "success");
+      router.push("/profile");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Xóa tin thất bại", "danger");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAddToWishlist = async (wishlistId: string) => {
+    if (!token) return showToast("Vui lòng đăng nhập để lưu sản phẩm", "default");
+    try {
+      await api.addWishlistItem(token, wishlistId, params.listingId);
+      showToast("Đã thêm sản phẩm vào danh sách ước!", "success");
+      setShowWishlistSelector(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Không thể thêm vào wishlist", "danger");
+    }
+  };
+
+  const handleCreateAndAddWishlist = async () => {
+    if (!token) return showToast("Vui lòng đăng nhập", "default");
+    if (!newWishlistName.trim()) return;
+    try {
+      const wishlist = await api.createWishlist(token, { name: newWishlistName });
+      await api.addWishlistItem(token, wishlist.id, params.listingId);
+      showToast(`Đã tạo Wishlist "${newWishlistName}" và thêm sản phẩm!`, "success");
+      setWishlists([...wishlists, wishlist]);
+      setNewWishlistName("");
+      setShowWishlistSelector(false);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Có lỗi xảy ra", "danger");
+    }
   };
 
   const handleShare = () => {
@@ -222,6 +265,8 @@ export default function ListingDetailPage() {
               <span className={`badge ${statusCls}`}>{statusLabels[listing.status] ?? listing.status}</span>
               <span className="badge">{conditionLabels[listing.condition] ?? listing.condition}</span>
               {listing.category ? <span className="badge badge-info">{listing.category.name}</span> : null}
+              {listing.brand ? <span className="badge badge-warning">Hiệu: {listing.brand}</span> : null}
+              {listing.has_warranty ? <span className="badge badge-success">✓ Còn bảo hành</span> : null}
             </div>
 
             <div className="price">{formatPrice(listing.price)} ₫</div>
@@ -237,7 +282,9 @@ export default function ListingDetailPage() {
             ) : null}
 
             <div className="muted" style={{ fontSize: 12 }}>
-              Đăng {timeAgo(listing.created_at)} · {formatDate(listing.created_at)}
+              {mounted ? (
+                <>Đăng {timeAgo(listing.created_at)} · {formatDate(listing.created_at)}</>
+              ) : "..."}
             </div>
 
             <div className="divider" />
@@ -246,6 +293,9 @@ export default function ListingDetailPage() {
               <button className="button secondary sm" type="button" onClick={handleFavorite}>
                 {favorited ? "❤️ Đã thích" : "🤍 Yêu thích"}
               </button>
+              <button className="button secondary sm" type="button" onClick={() => setShowWishlistSelector(!showWishlistSelector)}>
+                ⭐ Wishlist
+              </button>
               <button className="button ghost sm" type="button" onClick={handleShare}>📤 Chia sẻ</button>
               {!isOwner ? (
                 <button className="button ghost sm" type="button" onClick={handleConversation} disabled={actionLoading}>
@@ -253,6 +303,36 @@ export default function ListingDetailPage() {
                 </button>
               ) : null}
             </div>
+
+            {showWishlistSelector && (
+              <div className="panel" style={{ marginTop: 10, background: "var(--bg-inset)", display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: "var(--radius)" }}>
+                <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Chọn danh sách ước (Wishlist)</h4>
+                {wishlists.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {wishlists.map(w => (
+                      <button key={w.id} type="button" className="button secondary sm" onClick={() => handleAddToWishlist(w.id)}>
+                        📁 {w.name}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="muted" style={{ fontSize: 12, margin: 0 }}>Bạn chưa có danh sách ước nào.</p>
+                )}
+                
+                <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                  <input 
+                    placeholder="Tên danh sách ước mới..." 
+                    value={newWishlistName} 
+                    onChange={e => setNewWishlistName(e.target.value)}
+                    style={{ flex: 1, padding: "6px 10px", fontSize: 12, borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text)" }}
+                  />
+                  <button type="button" className="button primary sm" onClick={handleCreateAndAddWishlist} disabled={!newWishlistName.trim()}>
+                    Tạo & Lưu
+                  </button>
+                  <button type="button" className="button ghost sm" onClick={() => setShowWishlistSelector(false)}>Hủy</button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Q&A Section */}
@@ -329,6 +409,28 @@ export default function ListingDetailPage() {
             </div>
             <span style={{ color: "var(--text-tertiary)", fontSize: 18 }}>→</span>
           </Link>
+
+          {/* Owner Actions */}
+          {isOwner && (
+            <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 14, border: "1px solid var(--border)" }}>
+              <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>⚙️ Quản lý tin đăng</h2>
+              <p className="muted" style={{ fontSize: 13, margin: 0 }}>Bạn là chủ sở hữu của tin đăng này.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <Link href={`/listings/${listing.id}/edit`} className="button primary sm" style={{ width: "100%", display: "block", textAlign: "center", textDecoration: "none", padding: "8px 12px" }}>
+                  ✏️ Chỉnh sửa tin đăng
+                </Link>
+                <button 
+                  className="button danger sm" 
+                  type="button" 
+                  onClick={handleDeleteListing} 
+                  disabled={actionLoading}
+                  style={{ width: "100%", display: "block", padding: "8px 12px" }}
+                >
+                  🗑️ Xóa tin đăng (Đưa vào Thùng rác)
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Offer form */}
           {!isOwner && listing.status === "AVAILABLE" ? (

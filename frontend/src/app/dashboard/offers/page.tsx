@@ -57,7 +57,7 @@ export default function OffersDashboardPage() {
   // Meetup scheduling
   const [meetupDealId, setMeetupDealId] = useState<string | null>(null);
   const [meetupDate, setMeetupDate] = useState("");
-  const [meetupLocation, setMeetupLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
+  const [meetupLocation, setMeetupLocation] = useState<{ lat: number; lng: number; address: string; symbol_type?: string } | null>(null);
 
   // Review states
   const [reviewDealId, setReviewDealId] = useState<string | null>(null);
@@ -136,7 +136,7 @@ export default function OffersDashboardPage() {
       await api.scheduleMeetup(token, {
         deal_id: meetupDealId,
         scheduled_at: new Date(meetupDate).toISOString(),
-        location: meetupLocation ? { lat: meetupLocation.lat, lng: meetupLocation.lng, address: meetupLocation.address } : null,
+        location: meetupLocation ? { lat: meetupLocation.lat, lng: meetupLocation.lng, address: meetupLocation.address, symbol_type: meetupLocation.symbol_type || "STANDARD" } : null,
       });
       showToast("Đã hẹn gặp thành công!", "success");
       setMeetupDealId(null); setMeetupDate(""); setMeetupLocation(null);

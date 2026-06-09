@@ -1,4 +1,4 @@
-﻿param(
+﻿﻿param(
     [switch]$NoTest,     # Skip tests and build checks
     [switch]$NoPush      # Perform commit but skip git push
 )

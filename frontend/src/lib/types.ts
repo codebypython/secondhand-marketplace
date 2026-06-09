@@ -58,6 +58,7 @@ export interface Listing {
   has_warranty?: boolean;
   location_data?: Record<string, unknown> | null;
   image_urls: string[];
+  video_url?: string | null;
   status: ListingStatus;
   created_at: string;
   updated_at?: string | null;
@@ -180,5 +181,16 @@ export interface Wishlist {
   is_public: boolean;
   created_at: string;
   items: WishlistItem[];
+}
+
+export interface MapLegend {
+  id: string;
+  symbol_type: string;
+  icon: string;
+  name: string;
+  description: string;
+  color: string;
+  created_at: string;
+  updated_at: string;
 }
 

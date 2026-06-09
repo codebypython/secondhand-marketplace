@@ -30,9 +30,52 @@ export default function NewListingPage() {
   const [brand, setBrand] = useState("");
   const [hasWarranty, setHasWarranty] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
-  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string; symbol_type?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // AI states
+  const [aiChecking, setAiChecking] = useState(false);
+  const [aiResult, setAiResult] = useState<any>(null);
+
+  const handleAiCheck = async () => {
+    const firstUrl = imageUrls[0]?.trim();
+    if (!firstUrl) {
+      showToast("Vui lòng nhập URL hình ảnh trước.", "danger");
+      return;
+    }
+    if (!token) return;
+    setAiChecking(true);
+    setAiResult(null);
+    try {
+      const result = await api.classifyListingImage(token, firstUrl);
+      setAiResult(result);
+      if (result.is_prohibited) {
+        showToast(`Cảnh báo: Ảnh có chứa sản phẩm vi phạm chính sách (${result.prohibited_reason})`, "danger");
+      } else {
+        showToast("Ảnh an toàn! Đã phân tích thành công.", "success");
+      }
+    } catch (e) {
+      console.error(e);
+      showToast("Không thể kết nối dịch vụ phân tích AI.", "danger");
+    } finally {
+      setAiChecking(false);
+    }
+  };
+
+  const applyAiCategory = () => {
+    if (!aiResult || !aiResult.category_slug) return;
+    const cat = categories.find((c) => c.slug === aiResult.category_slug || c.name === aiResult.category_name);
+    if (cat) {
+      setCategoryId(cat.id);
+      showToast(`Đã áp dụng danh mục: ${cat.name}`, "success");
+    } else {
+      showToast("Không tìm thấy danh mục tương ứng.", "danger");
+    }
+  };
+
 
   useEffect(() => {
     let active = true;
@@ -66,7 +109,8 @@ export default function NewListingPage() {
         brand: brand || null,
         has_warranty: hasWarranty,
         image_urls: imageUrls.map((u) => u.trim()).filter(Boolean),
-        location_data: location ? { lat: location.lat, lng: location.lng, address: location.address } : null,
+        video_url: videoUrl || null,
+        location_data: location ? { lat: location.lat, lng: location.lng, address: location.address, symbol_type: location.symbol_type || "STANDARD" } : null,
       });
       showToast("Đăng tin thành công!", "success");
       router.push(`/listings/${listing.id}`);
@@ -194,9 +238,109 @@ export default function NewListingPage() {
               ) : null}
             </div>
           ))}
-          <button type="button" className="button ghost sm" onClick={addImageUrl} style={{ alignSelf: "flex-start" }}>
-            ＋ Thêm ảnh
-          </button>
+          <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+            <button type="button" className="button ghost sm" onClick={addImageUrl}>
+              ＋ Thêm ảnh
+            </button>
+            <button
+              type="button"
+              className="button secondary sm"
+              onClick={handleAiCheck}
+              disabled={aiChecking || !imageUrls[0]?.trim()}
+              style={{ display: "flex", alignItems: "center", gap: 6 }}
+            >
+              <Sparkles size={16} />
+              {aiChecking ? "Đang phân tích..." : "Phân tích ảnh bằng AI"}
+            </button>
+          </div>
+
+          {aiResult && (
+            <div
+              className="panel"
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: "8px",
+                border: aiResult.is_prohibited ? "1px solid var(--danger)" : "1px solid rgba(99, 102, 241, 0.2)",
+                backgroundColor: aiResult.is_prohibited ? "rgba(239, 68, 68, 0.05)" : "rgba(99, 102, 241, 0.03)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <Sparkles size={16} style={{ color: aiResult.is_prohibited ? "var(--danger)" : "var(--primary)" }} />
+                <strong style={{ fontSize: 13, color: aiResult.is_prohibited ? "var(--danger)" : "var(--text)" }}>
+                  Kết quả phân tích AI
+                </strong>
+                {aiResult.mock && (
+                  <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, backgroundColor: "var(--border)", color: "var(--text-muted)" }}>
+                    Mô phỏng
+                  </span>
+                )}
+              </div>
+              {aiResult.is_prohibited ? (
+                <div style={{ fontSize: 12, color: "var(--danger)" }}>
+                  <strong>CẢNH BÁO VI PHẠM:</strong> {aiResult.prohibited_reason}
+                  <p style={{ margin: "4px 0 0 0", fontSize: 11, color: "var(--text-muted)" }}>
+                    Lưu ý: Tin đăng của bạn sẽ tự động bị ẩn sau khi tạo nếu bạn tiếp tục sử dụng ảnh này.
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
+                    Gợi ý danh mục: <strong>{aiResult.category_name}</strong> ({(aiResult.confidence * 100).toFixed(0)}% tin cậy)
+                  </div>
+                  {aiResult.category_slug && (
+                    <button
+                      type="button"
+                      className="button primary sm"
+                      onClick={applyAiCategory}
+                      style={{ padding: "4px 8px", fontSize: 11 }}
+                    >
+                      Áp dụng danh mục
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="field">
+          <label>Video mô tả sản phẩm (Tùy chọn)</label>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <input
+              placeholder="Chọn hoặc nhập URL video..."
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <label className="button secondary" style={{ cursor: uploadingVideo ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={async (e) => {
+                  if (!e.target.files || e.target.files.length === 0) return;
+                  setUploadingVideo(true);
+                  try {
+                    const res = await api.uploadMedia(token, e.target.files[0]);
+                    setVideoUrl(res.url);
+                    showToast("Tải lên video thành công!", "success");
+                  } catch (err) {
+                    showToast(err instanceof Error ? err.message : "Tải lên video thất bại.", "danger");
+                  } finally {
+                    setUploadingVideo(false);
+                  }
+                }}
+                disabled={uploadingVideo}
+                style={{ display: "none" }}
+              />
+              {uploadingVideo ? "Đang tải..." : "📁 Tải lên Video"}
+            </label>
+          </div>
+          {videoUrl && (
+            <div style={{ marginTop: 10 }}>
+              <video src={videoUrl} controls style={{ maxWidth: "100%", height: 180, borderRadius: 8, border: "1px solid var(--border)" }} />
+            </div>
+          )}
         </div>
 
         <div className="field">

@@ -34,7 +34,9 @@ from app.models.enums import (  # noqa: E402
 from app.models.transaction import Deal, Meetup, Offer  # noqa: E402
 from app.models.chat import Conversation, Message  # noqa: E402
 from app.models.moderation import Block, Report  # noqa: E402
+from app.models.map_legend import MapLegend  # noqa: E402
 from app.models.associations import user_favorite_listing, conversation_participant  # noqa: E402
+from sqlalchemy import select
 
 # ==============================================================================
 # 1. USER DATA
@@ -169,6 +171,23 @@ def seed():
             return
 
         print("🌱 Bắt đầu tạo dữ liệu mẫu...")
+
+        # --- Map Legends ---
+        print("  🌱 Khởi tạo chú thích ký hiệu bản đồ mẫu...")
+        default_legends = [
+            {"symbol_type": "STANDARD", "icon": "📍", "name": "Điểm hẹn thường", "description": "Địa điểm giao dịch mặc định theo thỏa thuận giữa hai bên.", "color": "#6366f1"},
+            {"symbol_type": "SAFE_ZONE", "icon": "👮", "name": "Khu vực an toàn", "description": "Gần đồn cảnh sát hoặc văn phòng chính quyền công cộng. Rất an toàn, khuyên dùng cho các giao dịch giá trị cao.", "color": "#10b981"},
+            {"symbol_type": "COFFEE", "icon": "☕", "name": "Quán cà phê", "description": "Thích hợp để ngồi test thử sản phẩm điện tử, trao đổi thoải mái.", "color": "#f59e0b"},
+            {"symbol_type": "STORE", "icon": "🏪", "name": "Cửa hàng tiện lợi", "description": "Khu vực sáng sủa, có camera an ninh, mở cửa 24/7 và đông người qua lại.", "color": "#3b82f6"},
+            {"symbol_type": "HOME", "icon": "🏠", "name": "Nhà riêng", "description": "Địa chỉ nhà của người mua hoặc người bán. Nên cân nhắc trước khi chia sẻ.", "color": "#8b5cf6"},
+            {"symbol_type": "PARK", "icon": "🌳", "name": "Công viên", "description": "Khu vực ngoài trời thoáng mát, thích hợp hẹn gặp ban ngày.", "color": "#ec4899"},
+        ]
+        for leg in default_legends:
+            if not session.scalar(select(MapLegend).where(MapLegend.symbol_type == leg["symbol_type"])):
+                legend_obj = MapLegend(**leg)
+                session.add(legend_obj)
+        session.flush()
+        print("  ✅ Đã khởi tạo các chú thích ký hiệu bản đồ")
 
         # --- Categories ---
         categories = []

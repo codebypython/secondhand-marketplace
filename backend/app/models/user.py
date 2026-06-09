@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey, String
+from sqlalchemy import Date, ForeignKey, String, DateTime
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from app.models.listing import Listing
     from app.models.social import Review, UserFollow, Wishlist
     from app.models.transaction import Deal, Offer
+    from app.models.notification import Notification
+    from app.models.audit import ActivityLog
 
 
 class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -34,6 +36,8 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         default=UserStatus.ACTIVE,
         nullable=False,
     )
+    reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     profile: Mapped[Profile | None] = relationship(
         back_populates="user",
@@ -64,6 +68,9 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     following: Mapped[list[UserFollow]] = relationship(foreign_keys="UserFollow.follower_id", cascade="all, delete-orphan")
     reviews_received: Mapped[list[Review]] = relationship(foreign_keys="Review.target_id", cascade="all, delete-orphan")
     reviews_given: Mapped[list[Review]] = relationship(foreign_keys="Review.reviewer_id")
+    notifications: Mapped[list[Notification]] = relationship(back_populates="recipient", cascade="all, delete-orphan")
+    activities: Mapped[list[ActivityLog]] = relationship(back_populates="actor")
+
 
     @validates("email")
     def validate_email(self, _key: str, value: str) -> str:

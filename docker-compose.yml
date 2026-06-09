@@ -23,6 +23,8 @@ services:
       DATABASE_URL: postgresql+psycopg://app:app@postgres:5432/secondhand_marketplace
       JWT_SECRET_KEY: change-me-in-dev-please-use-at-least-32-bytes
       BACKEND_CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
+      AI_SERVICE_URL: http://ai-service:8002
+      AI_CONFIDENCE_THRESHOLD: '0.5'
     ports:
       - "8000:8000"
     depends_on:
@@ -39,5 +41,14 @@ services:
     depends_on:
       - backend
 
+  ai-service:
+    build:
+      context: ./ai-service
+    ports:
+      - "8002:8002"
+    environment:
+      AI_CONFIDENCE_THRESHOLD: '0.5'
+
 volumes:
   postgres_data:
+

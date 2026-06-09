@@ -51,7 +51,10 @@ export default function LoginPage() {
           </div>
 
           <div className="field">
-            <label htmlFor="password">Mật khẩu</label>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <label htmlFor="password">Mật khẩu</label>
+              <Link href={email ? `/forgot-password?email=${encodeURIComponent(email)}` : "/forgot-password"} style={{ fontSize: 13, color: "var(--primary)" }}>Quên mật khẩu?</Link>
+            </div>
             <div className="password-field">
               <input
                 id="password"

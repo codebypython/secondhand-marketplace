@@ -117,60 +117,270 @@ class EventBus:
 event_bus = EventBus()
 
 
-# ── Default Handlers (Audit Logging) ─────────────────────────────────────────
+# ── Default Handlers (Audit Logging & Notifications) ─────────────────────────
+
+from app.db.session import SessionFactory
+from app.models.listing import Listing
+from app.models.transaction import Offer, Deal, Meetup
+from app.models.enums import NotificationType
+from app.services.notification import create_notification
+from app.services.audit import log_activity
 
 
 @event_bus.subscribe(OfferAcceptedEvent)
-def log_offer_accepted(event: OfferAcceptedEvent) -> None:
+def handle_offer_accepted(event: OfferAcceptedEvent) -> None:
+    offer_id = event.data.get("offer_id")
+    deal_id = event.data.get("deal_id")
+    buyer_id = event.data.get("buyer_id")
+    seller_id = event.data.get("seller_id")
+    listing_id = event.data.get("listing_id")
+    
     logger.info(
         "📋 [DOMAIN EVENT] OfferAccepted — offer_id=%s, deal_id=%s, buyer_id=%s, listing_id=%s",
-        event.data.get("offer_id"),
-        event.data.get("deal_id"),
-        event.data.get("buyer_id"),
-        event.data.get("listing_id"),
+        offer_id, deal_id, buyer_id, listing_id
     )
+    
+    with SessionFactory() as session:
+        listing = session.get(Listing, listing_id)
+        listing_title = listing.title if listing else "sản phẩm"
+        
+        # 1. Notify Buyer
+        create_notification(
+            session,
+            recipient_id=buyer_id,
+            type=NotificationType.OFFER_ACCEPTED,
+            title="Đề xuất mua hàng được chấp nhận",
+            message=f"Đề xuất mua '{listing_title}' với giá {event.data.get('agreed_price')}đ của bạn đã được chấp nhận. Thỏa thuận đã được tạo.",
+            link="/dashboard/offers"
+        )
+        # 2. Notify Seller
+        create_notification(
+            session,
+            recipient_id=seller_id,
+            type=NotificationType.OFFER_ACCEPTED,
+            title="Bạn đã chấp nhận đề xuất mua hàng",
+            message=f"Bạn đã chấp nhận đề xuất mua '{listing_title}' với giá {event.data.get('agreed_price')}đ.",
+            link="/dashboard/offers"
+        )
+        # 3. Log Activity
+        log_activity(
+            session,
+            actor_id=seller_id,
+            verb="accept_offer",
+            target_type="Offer",
+            target_id=offer_id,
+            details={"deal_id": deal_id, "listing_id": listing_id}
+        )
 
 
 @event_bus.subscribe(OfferDeclinedEvent)
-def log_offer_declined(event: OfferDeclinedEvent) -> None:
+def handle_offer_declined(event: OfferDeclinedEvent) -> None:
+    offer_id = event.data.get("offer_id")
+    listing_id = event.data.get("listing_id")
+    
     logger.info(
         "📋 [DOMAIN EVENT] OfferDeclined — offer_id=%s",
-        event.data.get("offer_id"),
+        offer_id
     )
+    
+    with SessionFactory() as session:
+        offer = session.get(Offer, offer_id)
+        listing = session.get(Listing, listing_id)
+        listing_title = listing.title if listing else "sản phẩm"
+        
+        if offer:
+            # Notify Buyer
+            create_notification(
+                session,
+                recipient_id=str(offer.buyer_id),
+                type=NotificationType.OFFER_DECLINED,
+                title="Đề xuất mua hàng bị từ chối",
+                message=f"Đề xuất mua '{listing_title}' của bạn đã bị từ chối.",
+                link="/dashboard/offers"
+            )
+            # Log Activity
+            log_activity(
+                session,
+                actor_id=listing.owner_id if listing else None,
+                verb="decline_offer",
+                target_type="Offer",
+                target_id=offer_id,
+                details={"listing_id": listing_id}
+            )
 
 
 @event_bus.subscribe(OfferCounteredEvent)
-def log_offer_countered(event: OfferCounteredEvent) -> None:
+def handle_offer_countered(event: OfferCounteredEvent) -> None:
+    parent_offer_id = event.data.get("parent_offer_id")
+    new_offer_id = event.data.get("new_offer_id")
+    price = event.data.get("price")
+    listing_id = event.data.get("listing_id")
+    
     logger.info(
         "📋 [DOMAIN EVENT] OfferCountered — parent_offer_id=%s, new_offer_id=%s, price=%s",
-        event.data.get("parent_offer_id"),
-        event.data.get("new_offer_id"),
-        event.data.get("price"),
+        parent_offer_id, new_offer_id, price
     )
+    
+    with SessionFactory() as session:
+        new_offer = session.get(Offer, new_offer_id)
+        listing = session.get(Listing, listing_id)
+        listing_title = listing.title if listing else "sản phẩm"
+        
+        if new_offer and listing:
+            if new_offer.is_counter_from_seller:
+                # Counter from seller to buyer
+                recipient_id = str(new_offer.buyer_id)
+                actor_id = str(listing.owner_id)
+                msg = f"Người bán đã phản hồi giá mới {price}đ cho sản phẩm '{listing_title}'."
+            else:
+                # Counter from buyer to seller
+                recipient_id = str(listing.owner_id)
+                actor_id = str(new_offer.buyer_id)
+                msg = f"Người mua đã phản hồi giá mới {price}đ cho sản phẩm '{listing_title}'."
+                
+            create_notification(
+                session,
+                recipient_id=recipient_id,
+                type=NotificationType.OFFER_COUNTERED,
+                title="Đề xuất phản hồi giá mới",
+                message=msg,
+                link="/dashboard/offers"
+            )
+            log_activity(
+                session,
+                actor_id=actor_id,
+                verb="counter_offer",
+                target_type="Offer",
+                target_id=new_offer_id,
+                details={"parent_offer_id": parent_offer_id, "price": price}
+            )
 
 
 @event_bus.subscribe(DealCompletedEvent)
-def log_deal_completed(event: DealCompletedEvent) -> None:
+def handle_deal_completed(event: DealCompletedEvent) -> None:
+    deal_id = event.data.get("deal_id")
+    listing_id = event.data.get("listing_id")
+    buyer_id = event.data.get("buyer_id")
+    seller_id = event.data.get("seller_id")
+    
     logger.info(
         "📋 [DOMAIN EVENT] DealCompleted — deal_id=%s, listing_id=%s",
-        event.data.get("deal_id"),
-        event.data.get("listing_id"),
+        deal_id, listing_id
     )
+    
+    with SessionFactory() as session:
+        listing = session.get(Listing, listing_id)
+        listing_title = listing.title if listing else "sản phẩm"
+        
+        # Notify both parties
+        create_notification(
+            session,
+            recipient_id=buyer_id,
+            type=NotificationType.DEAL_COMPLETED,
+            title="Giao dịch hoàn tất thành công",
+            message=f"Giao dịch mua '{listing_title}' đã hoàn tất. Hãy để lại đánh giá cho người bán!",
+            link=f"/users/{seller_id}" # link to seller profile for review
+        )
+        create_notification(
+            session,
+            recipient_id=seller_id,
+            type=NotificationType.DEAL_COMPLETED,
+            title="Giao dịch hoàn tất thành công",
+            message=f"Giao dịch bán '{listing_title}' đã hoàn tất. Thỏa thuận giao dịch thành công.",
+            link="/dashboard/offers"
+        )
+        log_activity(
+            session,
+            actor_id=buyer_id, # buyer check-in finishes it usually
+            verb="complete_deal",
+            target_type="Deal",
+            target_id=deal_id,
+            details={"listing_id": listing_id}
+        )
 
 
 @event_bus.subscribe(DealCancelledEvent)
-def log_deal_cancelled(event: DealCancelledEvent) -> None:
+def handle_deal_cancelled(event: DealCancelledEvent) -> None:
+    deal_id = event.data.get("deal_id")
+    listing_id = event.data.get("listing_id")
+    
     logger.info(
         "📋 [DOMAIN EVENT] DealCancelled — deal_id=%s, listing_id=%s",
-        event.data.get("deal_id"),
-        event.data.get("listing_id"),
+        deal_id, listing_id
     )
+    
+    with SessionFactory() as session:
+        deal = session.get(Deal, deal_id)
+        listing = session.get(Listing, listing_id)
+        listing_title = listing.title if listing else "sản phẩm"
+        
+        if deal:
+            create_notification(
+                session,
+                recipient_id=str(deal.buyer_id),
+                type=NotificationType.DEAL_CANCELLED,
+                title="Giao dịch đã bị hủy",
+                message=f"Giao dịch cho '{listing_title}' đã bị hủy.",
+                link="/dashboard/offers"
+            )
+            create_notification(
+                session,
+                recipient_id=str(deal.seller_id),
+                type=NotificationType.DEAL_CANCELLED,
+                title="Giao dịch đã bị hủy",
+                message=f"Giao dịch bán '{listing_title}' đã bị hủy. Tin đăng đã được mở bán lại.",
+                link="/dashboard/offers"
+            )
+            log_activity(
+                session,
+                actor_id=str(deal.seller_id),
+                verb="cancel_deal",
+                target_type="Deal",
+                target_id=deal_id,
+                details={"listing_id": listing_id}
+            )
 
 
 @event_bus.subscribe(MeetupCompletedEvent)
-def log_meetup_completed(event: MeetupCompletedEvent) -> None:
+def handle_meetup_completed(event: MeetupCompletedEvent) -> None:
+    meetup_id = event.data.get("meetup_id")
+    deal_id = event.data.get("deal_id")
+    
     logger.info(
         "📋 [DOMAIN EVENT] MeetupCompleted — meetup_id=%s, deal_id=%s",
-        event.data.get("meetup_id"),
-        event.data.get("deal_id"),
+        meetup_id, deal_id
     )
+    
+    with SessionFactory() as session:
+        meetup = session.get(Meetup, meetup_id)
+        deal = session.get(Deal, deal_id)
+        
+        if meetup and deal:
+            listing = session.get(Listing, deal.listing_id)
+            listing_title = listing.title if listing else "sản phẩm"
+            
+            # Notify both parties
+            create_notification(
+                session,
+                recipient_id=str(deal.buyer_id),
+                type=NotificationType.MEETUP_COMPLETED,
+                title="Cuộc hẹn gặp đã hoàn thành",
+                message=f"Cả hai bên đã check-in thành công tại điểm hẹn cho '{listing_title}'. Giao dịch đã hoàn tất.",
+                link="/dashboard/offers"
+            )
+            create_notification(
+                session,
+                recipient_id=str(deal.seller_id),
+                type=NotificationType.MEETUP_COMPLETED,
+                title="Cuộc hẹn gặp đã hoàn thành",
+                message=f"Cả hai bên đã check-in thành công tại điểm hẹn cho '{listing_title}'. Giao dịch đã hoàn tất.",
+                link="/dashboard/offers"
+            )
+            log_activity(
+                session,
+                actor_id=None,
+                verb="complete_meetup",
+                target_type="Meetup",
+                target_id=meetup_id,
+                details={"deal_id": deal_id}
+            )

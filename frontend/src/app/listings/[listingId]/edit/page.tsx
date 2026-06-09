@@ -35,7 +35,7 @@ export default function EditListingPage() {
   const [hasWarranty, setHasWarranty] = useState(false);
   const [status, setStatus] = useState<ListingStatus>("AVAILABLE");
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
-  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
+  const [location, setLocation] = useState<{ lat: number; lng: number; address?: string; symbol_type?: string } | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -106,7 +106,7 @@ export default function EditListingPage() {
         has_warranty: hasWarranty,
         status,
         image_urls: imageUrls.map((u) => u.trim()).filter(Boolean),
-        location_data: location ? { lat: location.lat, lng: location.lng, address: location.address } : null,
+        location_data: location ? { lat: location.lat, lng: location.lng, address: location.address, symbol_type: location.symbol_type || "STANDARD" } : null,
       });
       showToast("Cập nhật tin đăng thành công!", "success");
       router.push(`/listings/${params.listingId}`);

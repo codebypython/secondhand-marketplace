@@ -1,8 +1,12 @@
+import csv
+import io
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+
 
 from app.api.deps import get_current_user
 from app.db.session import get_db_session
@@ -160,3 +164,40 @@ def restore_listing_endpoint(
         return restore_listing(session, current_user, listing_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/export")
+def export_listings_csv_endpoint(
+    session: Session = Depends(get_db_session),
+    _current_user: User = Depends(get_current_user),
+) -> Any:
+    from sqlalchemy import select
+    from app.models.listing import Listing
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Owner ID", "Category ID", "Title", "Price", "Condition", "Status", "Created At"])
+    
+    listings = list(session.scalars(select(Listing)).all())
+    for l in listings:
+        cond_val = l.condition.value if hasattr(l.condition, "value") else l.condition
+        status_val = l.status.value if hasattr(l.status, "value") else l.status
+        writer.writerow([str(l.id), str(l.owner_id), str(l.category_id), l.title, str(l.price), str(cond_val), str(status_val), str(l.created_at)])
+        
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=listings_export.csv"},
+    )
+
+
+@router.post("/classify", status_code=status.HTTP_200_OK)
+def classify_image_endpoint(
+    image_url: str = Query(...),
+    session: Session = Depends(get_db_session),
+    _current_user: User = Depends(get_current_user),
+) -> Any:
+    from app.services.ai import classify_image_via_ai
+    return classify_image_via_ai(image_url)
+

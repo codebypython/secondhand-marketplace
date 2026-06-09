@@ -33,6 +33,11 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
         version="0.1.0",
         description="Production-leaning social marketplace backend",
     )
+    from fastapi.staticfiles import StaticFiles
+    import os
+    os.makedirs("static/uploads", exist_ok=True)
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.backend_cors_origins,

@@ -1,11 +1,14 @@
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models.enums import ReportStatus, UserRole
+from app.models.enums import ReportStatus, UserRole, NotificationType
 from app.models.moderation import Block, Report
 from app.models.transaction import Deal
 from app.models.user import User
 from app.schemas.moderation import BlockCreate, ReportCreate, ReportReview
+from app.services.notification import create_notification
+from app.services.audit import log_activity
+
 
 
 def ensure_not_blocked(session: Session, actor_id, other_user_id) -> None:
@@ -50,6 +53,27 @@ def review_report(session: Session, admin: User, report_id, payload: ReportRevie
     session.add(report)
     session.commit()
     session.refresh(report)
+
+    # Notify reporter
+    target_val = report.target_type.value if hasattr(report.target_type, 'value') else report.target_type
+    status_val = report.status.value if hasattr(report.status, 'value') else report.status
+    create_notification(
+        session,
+        recipient_id=str(report.reporter_id),
+        type=NotificationType.REPORT_RESOLVED,
+        title="Báo cáo vi phạm đã được xem xét",
+        message=f"Báo cáo của bạn về {target_val} (ID: {report.target_id}) đã được Admin xem xét và xử lý với trạng thái: {status_val}.",
+        link="/moderation"
+    )
+    # Log activity
+    log_activity(
+        session,
+        actor_id=str(admin.id),
+        verb="review_report",
+        target_type="Report",
+        target_id=str(report.id),
+        details={"status": status_val}
+    )
     return report
 
 
@@ -68,6 +92,15 @@ def block_user(session: Session, blocker: User, payload: BlockCreate) -> Block:
     session.add(block)
     session.commit()
     session.refresh(block)
+
+    # Log activity
+    log_activity(
+        session,
+        actor_id=str(blocker.id),
+        verb="block_user",
+        target_type="User",
+        target_id=str(payload.blocked_id)
+    )
     return block
 
 
@@ -87,6 +120,14 @@ def unblock_user(session: Session, blocker: User, blocked_id: str) -> None:
     session.delete(block)
     session.commit()
 
+    # Log activity
+    log_activity(
+        session,
+        actor_id=str(blocker.id),
+        verb="unblock_user",
+        target_type="User",
+        target_id=str(blocked_id)
+    )
 
 
 def list_disputed_deals(session: Session) -> list[Deal]:
@@ -121,5 +162,33 @@ def resolve_dispute(session: Session, admin: User, deal_id, resolution: str) -> 
     session.add_all([deal, listing])
     session.commit()
     session.refresh(deal)
+
+    # Notify buyer & seller
+    listing_title = listing.title if listing else "sản phẩm"
+    create_notification(
+        session,
+        recipient_id=str(deal.buyer_id),
+        type=NotificationType.SYSTEM,
+        title="Khiếu nại giao dịch đã được giải quyết",
+        message=f"Admin đã giải quyết khiếu nại cho sản phẩm '{listing_title}'. Kết quả: {resolution}.",
+        link="/dashboard/offers"
+    )
+    create_notification(
+        session,
+        recipient_id=str(deal.seller_id),
+        type=NotificationType.SYSTEM,
+        title="Khiếu nại giao dịch đã được giải quyết",
+        message=f"Admin đã giải quyết khiếu nại cho sản phẩm '{listing_title}'. Kết quả: {resolution}.",
+        link="/dashboard/offers"
+    )
+    log_activity(
+        session,
+        actor_id=str(admin.id),
+        verb="resolve_dispute",
+        target_type="Deal",
+        target_id=str(deal.id),
+        details={"resolution": resolution}
+    )
     return deal
+
 

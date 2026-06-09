@@ -2,9 +2,13 @@ from app.models.associations import conversation_participant, message_deleted_fo
 from app.models.chat import Conversation, Message
 from app.models.listing import Category, Listing
 from app.models.moderation import Block, Report
+from app.models.map_legend import MapLegend
 from app.models.social import ListingQuestion, Review, UserFollow, Wishlist, WishlistItem
 from app.models.transaction import Deal, Meetup, Offer
 from app.models.user import Profile, User
+from app.models.notification import Notification
+from app.models.audit import ActivityLog
+from app.models.mock_email import MockEmail
 
 __all__ = [
     "Block",
@@ -12,6 +16,7 @@ __all__ = [
     "Conversation",
     "Deal",
     "Listing",
+    "MapLegend",
     "Meetup",
     "Message",
     "Offer",
@@ -23,7 +28,11 @@ __all__ = [
     "Wishlist",
     "WishlistItem",
     "ListingQuestion",
+    "Notification",
+    "ActivityLog",
+    "MockEmail",
     "conversation_participant",
     "message_deleted_for",
     "user_favorite_listing",
 ]
+

@@ -1,4 +1,4 @@
-import type { AuthResponse, Block, Category, Conversation, Deal, Listing, Meetup, Offer, Report, User, UserPublic, ListingQuestion, Review, Wishlist } from "@/lib/types";
+import type { AuthResponse, Block, Category, Conversation, Deal, Listing, Meetup, Offer, Report, User, UserPublic, ListingQuestion, Review, Wishlist, MapLegend } from "@/lib/types";
 
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -160,4 +160,55 @@ export const api = {
     request<Deal[]>("/moderation/disputes", undefined, token),
   resolveDispute: (token: string, dealId: string, resolution: "COMPLETED" | "CANCELLED") =>
     request<Deal>(`/moderation/disputes/${dealId}/resolve`, { method: "POST", body: JSON.stringify({ resolution }) }, token),
+
+  // Notifications
+  listNotifications: (token: string) =>
+    request<any[]>("/notifications", undefined, token),
+  unreadCountNotifications: (token: string) =>
+    request<{ count: number }>("/notifications/unread-count", undefined, token),
+  readNotification: (token: string, notificationId: string) =>
+    request<any>(`/notifications/${notificationId}/read`, { method: "PATCH" }, token),
+  readAllNotifications: (token: string) =>
+    request<{ status: string }>("/notifications/read-all", { method: "POST" }, token),
+
+  // Audit Logs
+  listAuditLogs: (token: string) =>
+    request<any[]>("/moderation/audit-logs", undefined, token),
+
+  classifyListingImage: (token: string, imageUrl: string) =>
+    request<any>(`/listings/classify?image_url=${encodeURIComponent(imageUrl)}`, { method: "POST" }, token),
+
+  // Sprint 4 improvements
+  forgotPassword: (email: string) =>
+    request<any>("/auth/forgot-password", { method: "POST", body: JSON.stringify({ email }) }),
+  verifyResetToken: (token: string) =>
+    request<{ email: string }>(`/auth/verify-reset-token/${token}`),
+  resetPassword: (payload: Record<string, any>) =>
+    request<any>("/auth/reset-password", { method: "POST", body: JSON.stringify(payload) }),
+  listMockEmails: () =>
+    request<any[]>("/auth/mock-emails"),
+  getModerationAnalytics: (token: string) =>
+    request<any>("/moderation/analytics/stats", undefined, token),
+  listMapLegends: () =>
+    request<MapLegend[]>("/listings/map-legends"),
+  updateMapLegend: (token: string, symbol_type: string, payload: { icon: string; name: string; description: string; color: string }) =>
+    request<MapLegend>(`/moderation/map-legends/${symbol_type}`, { method: "PUT", body: JSON.stringify(payload) }, token),
+  uploadMedia: async (token: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await fetch(`${API_BASE}/media/upload`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new ApiError(data.detail ?? "Upload failed", response.status);
+    }
+    return response.json() as Promise<{ url: string }>;
+  }
 };
+
+

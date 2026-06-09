@@ -1,10 +1,13 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.enums import ListingStatus
+from app.models.enums import ListingStatus, NotificationType
 from app.models.listing import Category, Listing
 from app.models.user import User
 from app.schemas.listing import CategoryCreate, ListingCreate, ListingUpdate
+from app.services.ai import classify_image_via_ai
+from app.services.notification import create_notification
+from app.services.audit import log_activity
 
 
 def check_category_cycle(session: Session, parent_id: str | None, current_id: str | None = None) -> None:
@@ -24,6 +27,9 @@ def check_category_cycle(session: Session, parent_id: str | None, current_id: st
 
 
 def list_categories(session: Session) -> list[Category]:
+    return list_categories_for_real(session)
+
+def list_categories_for_real(session: Session) -> list[Category]:
     return list(session.scalars(select(Category).order_by(Category.name.asc())))
 
 
@@ -41,6 +47,53 @@ def create_listing(session: Session, owner: User, payload: ListingCreate) -> Lis
     owner.ensure_active()
     listing = Listing(owner_id=owner.id, **payload.model_dump())
     session.add(listing)
+    session.flush()
+
+    ai_suggested = None
+    if listing.image_urls:
+        try:
+            ai_result = classify_image_via_ai(listing.image_urls[0])
+            if ai_result.get("is_prohibited"):
+                listing.status = ListingStatus.HIDDEN
+                log_activity(
+                    session,
+                    actor_id=str(owner.id),
+                    verb="ai_flag_prohibited",
+                    target_type="Listing",
+                    target_id=str(listing.id),
+                    details={
+                        "reason": ai_result.get("prohibited_reason"),
+                        "confidence": ai_result.get("confidence"),
+                        "image_url": listing.image_urls[0]
+                    }
+                )
+                create_notification(
+                    session,
+                    recipient_id=str(owner.id),
+                    type=NotificationType.SYSTEM,
+                    title="Tin đăng bị ẩn do vi phạm chính sách",
+                    message=f"Tin đăng '{listing.title}' đã bị ẩn tự động vì hình ảnh vi phạm chính sách: {ai_result.get('prohibited_reason')}.",
+                    link="/profile"
+                )
+            else:
+                if not listing.category_id and ai_result.get("category_slug"):
+                    cat_slug = ai_result.get("category_slug")
+                    db_cat = session.scalar(select(Category).where(Category.slug == cat_slug))
+                    if db_cat:
+                        listing.category_id = db_cat.id
+                        ai_suggested = db_cat.name
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("AI moderation failed: %s", e)
+
+    log_activity(
+        session,
+        actor_id=str(owner.id),
+        verb="create_listing",
+        target_type="Listing",
+        target_id=str(listing.id),
+        details={"ai_suggested_category": ai_suggested} if ai_suggested else {}
+    )
     session.commit()
     return get_listing_or_error(session, listing.id)
 
@@ -83,9 +136,48 @@ def update_listing(session: Session, actor: User, listing_id, payload: ListingUp
     listing = get_listing_or_error(session, listing_id)
     if listing.owner_id != actor.id:
         raise ValueError("Only the owner can update this listing")
+        
+    old_image_urls = list(listing.image_urls)
     for field, value in payload.model_dump(exclude_unset=True).items():
         setattr(listing, field, value)
+        
+    if payload.image_urls is not None and payload.image_urls != old_image_urls and listing.image_urls:
+        try:
+            ai_result = classify_image_via_ai(listing.image_urls[0])
+            if ai_result.get("is_prohibited"):
+                listing.status = ListingStatus.HIDDEN
+                log_activity(
+                    session,
+                    actor_id=str(actor.id),
+                    verb="ai_flag_prohibited",
+                    target_type="Listing",
+                    target_id=str(listing.id),
+                    details={
+                        "reason": ai_result.get("prohibited_reason"),
+                        "confidence": ai_result.get("confidence"),
+                        "image_url": listing.image_urls[0]
+                    }
+                )
+                create_notification(
+                    session,
+                    recipient_id=str(actor.id),
+                    type=NotificationType.SYSTEM,
+                    title="Tin đăng bị ẩn do vi phạm chính sách",
+                    message=f"Tin đăng '{listing.title}' đã bị ẩn tự động vì hình ảnh vi phạm chính sách: {ai_result.get('prohibited_reason')}.",
+                    link="/profile"
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("AI moderation failed on update: %s", e)
+
     listing.touch()
+    log_activity(
+        session,
+        actor_id=str(actor.id),
+        verb="update_listing",
+        target_type="Listing",
+        target_id=str(listing.id)
+    )
     session.add(listing)
     session.commit()
     return get_listing_or_error(session, listing.id)
@@ -96,6 +188,13 @@ def delete_listing(session: Session, actor: User, listing_id) -> None:
     if listing.owner_id != actor.id:
         raise ValueError("Only the owner can delete this listing")
     listing.soft_delete()
+    log_activity(
+        session,
+        actor_id=str(actor.id),
+        verb="delete_listing",
+        target_type="Listing",
+        target_id=str(listing.id)
+    )
     session.add(listing)
     session.commit()
 

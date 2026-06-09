@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -10,6 +10,8 @@ import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Listing } from "@/lib/types";
 import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
+import { LocationDisplay } from "@/components/location-display";
+import { Video, Tv, X } from "lucide-react";
 
 export default function ListingDetailPage() {
   const params = useParams<{ listingId: string }>();
@@ -31,6 +33,268 @@ export default function ListingDetailPage() {
   const [wishlists, setWishlists] = useState<any[]>([]);
   const [showWishlistSelector, setShowWishlistSelector] = useState(false);
   const [newWishlistName, setNewWishlistName] = useState("");
+
+  // Livestream states & refs
+  const [streamActive, setStreamActive] = useState(false);
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const [isWatching, setIsWatching] = useState(false);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
+  const [wsTrigger, setWsTrigger] = useState(0);
+
+  const wsRef = useRef<WebSocket | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const viewerConnections = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const iceQueueRef = useRef<any[]>([]);
+
+  const stateRef = useRef({ isBroadcasting, isWatching, listingId: listing?.id, broadcasterId });
+  useEffect(() => {
+    stateRef.current = { isBroadcasting, isWatching, listingId: listing?.id, broadcasterId };
+  }, [isBroadcasting, isWatching, listing, broadcasterId]);
+
+  const startBroadcasting = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      setIsBroadcasting(true);
+      setStreamActive(true);
+      
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "stream_start",
+          listing_id: params.listingId
+        }));
+      }
+      showToast("Đang phát trực tiếp livestream!", "success");
+    } catch (err) {
+      showToast("Không thể mở camera/micro: " + (err instanceof Error ? err.message : ""), "danger");
+    }
+  };
+
+  const stopBroadcasting = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop());
+      localStreamRef.current = null;
+    }
+    setLocalStream(null);
+    setIsBroadcasting(false);
+    setStreamActive(false);
+    
+    viewerConnections.current.forEach(pc => pc.close());
+    viewerConnections.current.clear();
+    
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+    setWsTrigger(prev => prev + 1);
+    showToast("Đã dừng phát livestream", "default");
+  };
+
+  const startWatching = () => {
+    if (!token || !listing) return;
+    setIsWatching(true);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "stream_join",
+        listing_id: listing.id,
+        broadcaster_id: listing.owner_id
+      }));
+    }
+  };
+
+  const stopWatching = () => {
+    setIsWatching(false);
+    setRemoteStream(null);
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    iceQueueRef.current = [];
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: "stream_leave",
+        listing_id: listing?.id,
+        broadcaster_id: listing?.owner_id
+      }));
+    }
+  };
+
+  const handleViewerJoin = async (viewerId: string) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    });
+    viewerConnections.current.set(viewerId, pc);
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => {
+        pc.addTrack(track, localStreamRef.current!);
+      });
+    }
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && wsRef.current) {
+        wsRef.current.send(JSON.stringify({
+          type: "stream_ice",
+          target_id: viewerId,
+          candidate: event.candidate,
+          listing_id: params.listingId
+        }));
+      }
+    };
+
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      
+      if (wsRef.current) {
+        wsRef.current.send(JSON.stringify({
+          type: "stream_offer",
+          target_id: viewerId,
+          sdp: offer,
+          listing_id: params.listingId
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to create offer for viewer", viewerId, err);
+    }
+  };
+
+  const handleViewerLeave = (viewerId: string) => {
+    const pc = viewerConnections.current.get(viewerId);
+    if (pc) {
+      pc.close();
+      viewerConnections.current.delete(viewerId);
+    }
+  };
+
+  const handleStreamOffer = async (bId: string, sdp: any) => {
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+    });
+    pcRef.current = pc;
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && wsRef.current) {
+        wsRef.current.send(JSON.stringify({
+          type: "stream_ice",
+          target_id: bId,
+          candidate: event.candidate,
+          listing_id: params.listingId
+        }));
+      }
+    };
+
+    pc.ontrack = (event) => {
+      setRemoteStream(event.streams[0]);
+    };
+
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      if (wsRef.current) {
+        wsRef.current.send(JSON.stringify({
+          type: "stream_answer",
+          target_id: bId,
+          sdp: answer,
+          listing_id: params.listingId
+        }));
+      }
+
+      while (iceQueueRef.current.length > 0) {
+        const cand = iceQueueRef.current.shift();
+        await pc.addIceCandidate(new RTCIceCandidate(cand));
+      }
+    } catch (err) {
+      console.error("Error setting up remote stream", err);
+    }
+  };
+
+  const handleStreamAnswer = async (viewerId: string, sdp: any) => {
+    const pc = viewerConnections.current.get(viewerId);
+    if (pc) {
+      try {
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+      } catch (err) {
+        console.error("Error setting remote answer for viewer", viewerId, err);
+      }
+    }
+  };
+
+  const handleStreamIce = async (senderId: string, candidate: any) => {
+    const { isBroadcasting, isWatching } = stateRef.current;
+    if (isBroadcasting) {
+      const pc = viewerConnections.current.get(senderId);
+      if (pc) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error("Error adding ice candidate for viewer", senderId, err);
+        }
+      }
+    } else if (isWatching) {
+      if (pcRef.current && pcRef.current.remoteDescription) {
+        try {
+          await pcRef.current.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (err) {
+          console.error("Error adding ice candidate from broadcaster", err);
+        }
+      } else {
+        iceQueueRef.current.push(candidate);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (!token) return;
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+    const wsBase = apiBase.replace(/^http/, "ws");
+    const wsUrl = `${wsBase}/chat/ws/${token}`;
+
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        const { isBroadcasting: curBroadcasting, isWatching: curWatching, listingId, broadcasterId: curBroadcasterId } = stateRef.current;
+        
+        if (data.type === "stream_active" && data.listing_id === params.listingId) {
+          setStreamActive(true);
+          setBroadcasterId(data.broadcaster_id);
+        } else if (data.type === "stream_inactive" && data.broadcaster_id === curBroadcasterId) {
+          setStreamActive(false);
+          setBroadcasterId(null);
+          if (curWatching) {
+            stopWatching();
+            showToast("Livestream đã kết thúc.", "default");
+          }
+        } else if (data.type === "stream_join" && curBroadcasting) {
+          handleViewerJoin(data.viewer_id);
+        } else if (data.type === "stream_leave" && curBroadcasting) {
+          handleViewerLeave(data.viewer_id);
+        } else if (data.type === "stream_offer" && curWatching) {
+          handleStreamOffer(data.sender_id, data.sdp);
+        } else if (data.type === "stream_answer" && curBroadcasting) {
+          handleStreamAnswer(data.sender_id, data.sdp);
+        } else if (data.type === "stream_ice") {
+          handleStreamIce(data.sender_id, data.candidate);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [token, wsTrigger]);
 
   useEffect(() => {
     setMounted(true);
@@ -259,6 +523,14 @@ export default function ListingDetailPage() {
             <div className="panel" style={{ height: 240, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48, color: "var(--text-tertiary)" }}>📷</div>
           )}
 
+          {/* Description Video if exists */}
+          {listing.video_url && (
+            <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>🎥 Video mô tả sản phẩm</h3>
+              <video src={listing.video_url} controls style={{ width: "100%", maxHeight: 360, borderRadius: 8, background: "#000" }} />
+            </div>
+          )}
+
           {/* Product info card */}
           <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div className="inline">
@@ -276,8 +548,9 @@ export default function ListingDetailPage() {
             </p>
 
             {listing.location_data ? (
-              <div className="inline" style={{ color: "var(--text-secondary)", fontSize: 13 }}>
-                📍 {typeof listing.location_data === "object" && "city" in listing.location_data ? String(listing.location_data.city) : JSON.stringify(listing.location_data)}
+              <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 10 }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>📍 Địa điểm giao dịch</span>
+                <LocationDisplay location={listing.location_data} />
               </div>
             ) : null}
 
@@ -428,7 +701,44 @@ export default function ListingDetailPage() {
                 >
                   🗑️ Xóa tin đăng (Đưa vào Thùng rác)
                 </button>
+                <button
+                  type="button"
+                  className="button secondary sm"
+                  onClick={startBroadcasting}
+                  style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "8px 12px" }}
+                >
+                  <Video size={16} /> Phát livestream giới thiệu
+                </button>
               </div>
+            </div>
+          )}
+
+          {/* Livestream Area */}
+          {!isOwner && (
+            <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 12, border: streamActive ? "1.5px solid var(--danger, #ef4444)" : "1px solid var(--border)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
+                  <Tv size={18} /> Livestream sản phẩm
+                </h3>
+                {streamActive && (
+                  <span style={{ fontSize: 11, background: "var(--danger, #ef4444)", color: "white", padding: "2px 6px", borderRadius: 4, fontWeight: "bold", animation: "pulse 1.5s infinite" }}>
+                    🔴 LIVE
+                  </span>
+                )}
+              </div>
+              <p className="muted" style={{ fontSize: 12, margin: 0 }}>
+                {streamActive 
+                  ? "Chủ sản phẩm đang phát trực tiếp! Xem ngay để thấy rõ chi tiết sản phẩm."
+                  : "Hiện tại không có livestream nào từ người bán."}
+              </p>
+              <button 
+                className={`button ${streamActive ? "danger" : "secondary"} sm`} 
+                type="button" 
+                onClick={startWatching}
+                style={{ width: "100%" }}
+              >
+                📺 Xem Livestream giới thiệu
+              </button>
             </div>
           )}
 
@@ -492,6 +802,99 @@ export default function ListingDetailPage() {
           </div>
         </div>
       ) : null}
+      {/* Broadcaster Modal */}
+      {isBroadcasting && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.95)", backdropFilter: "blur(12px)",
+          zIndex: 9999, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", color: "white", padding: 20
+        }}>
+          <div style={{ width: "100%", maxWidth: 650, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ color: "white", margin: 0 }}>🔴 Đang phát Livestream</h2>
+              <span style={{ fontSize: 11, background: "var(--danger)", color: "white", padding: "4px 8px", borderRadius: 4, fontWeight: "bold" }}>
+                LIVE
+              </span>
+            </div>
+            
+            <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "#1e293b", height: 380 }}>
+              <video 
+                ref={(el) => { if (el) el.srcObject = localStream; }} 
+                autoPlay 
+                playsInline 
+                muted 
+                style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} 
+              />
+              <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
+                Camera của bạn
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", gap: 15 }}>
+              <button className="button danger" onClick={stopBroadcasting} style={{ padding: "12px 24px" }}>
+                Dừng phát sóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Viewer Modal */}
+      {isWatching && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.95)", backdropFilter: "blur(12px)",
+          zIndex: 9999, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", color: "white", padding: 20
+        }}>
+          <div style={{ width: "100%", maxWidth: 650, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ color: "white", margin: 0 }}>📺 Xem Livestream giới thiệu</h2>
+              <button 
+                type="button" 
+                onClick={stopWatching} 
+                style={{ background: "none", border: "none", color: "white", cursor: "pointer", fontSize: 20 }}
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "#1e293b", height: 380 }}>
+              {remoteStream ? (
+                <video 
+                  ref={(el) => { if (el) el.srcObject = remoteStream; }} 
+                  autoPlay 
+                  playsInline 
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                />
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)" }}>
+                  <div className="spinner" style={{ marginBottom: 15 }} />
+                  <span>Đang chờ nhận luồng video từ người bán...</span>
+                </div>
+              )}
+              <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
+                Video người bán
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", gap: 15 }}>
+              <button className="button secondary" onClick={stopWatching} style={{ padding: "10px 20px" }}>
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes pulse {
+          0% { opacity: 0.6; }
+          50% { opacity: 1; }
+          100% { opacity: 0.6; }
+        }
+      `}</style>
     </PageShell>
   );
 }

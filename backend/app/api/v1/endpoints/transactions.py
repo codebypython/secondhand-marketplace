@@ -1,8 +1,12 @@
+import csv
+import io
 from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+
 
 from app.api.deps import get_current_user
 from app.db.session import get_db_session
@@ -201,3 +205,36 @@ def check_in_meetup_endpoint(
         return check_in_meetup(session, current_user, str(meetup_id))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/deals/export")
+def export_deals_csv_endpoint(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    from sqlalchemy import select
+    from app.models.transaction import Deal
+    from app.models.enums import UserRole
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["ID", "Listing ID", "Buyer ID", "Seller ID", "Agreed Price", "Status", "Created At"])
+
+    if current_user.role == UserRole.ADMIN:
+        deals = list(session.scalars(select(Deal)).all())
+    else:
+        from sqlalchemy import or_
+        stmt = select(Deal).where(or_(Deal.buyer_id == current_user.id, Deal.seller_id == current_user.id))
+        deals = list(session.scalars(stmt).all())
+
+    for d in deals:
+        status_val = d.status.value if hasattr(d.status, "value") else d.status
+        writer.writerow([str(d.id), str(d.listing_id), str(d.buyer_id), str(d.seller_id), str(d.agreed_price), str(status_val), str(d.created_at)])
+
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode("utf-8-sig")),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=deals_export.csv"},
+    )
+

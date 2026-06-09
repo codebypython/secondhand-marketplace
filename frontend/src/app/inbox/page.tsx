@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, X, MessageCircle } from "lucide-react";
+import { Plus, X, MessageCircle, Video, Phone, PhoneOff, Image } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -20,11 +20,25 @@ export default function InboxPage() {
   const [searchConv, setSearchConv] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Create conversation form
   const [showCreate, setShowCreate] = useState(false);
   const [participantId, setParticipantId] = useState("");
   const [listingId, setListingId] = useState("");
   const [title, setTitle] = useState("");
+
+  // WebSocket and WebRTC Refs & States
+  const wsRef = useRef<WebSocket | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const iceCandidatesQueue = useRef<any[]>([]);
+
+  const [callActive, setCallActive] = useState(false);
+  const [isIncomingCall, setIsIncomingCall] = useState(false);
+  const [callerId, setCallerId] = useState<string | null>(null);
+  const [callerName, setCallerName] = useState("");
+  const [callSDP, setCallSDP] = useState<any>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const reload = async () => {
     if (!token) return;
@@ -50,22 +64,226 @@ export default function InboxPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [selectedId, conversations]);
 
-  // Auto-refresh messages every 5 seconds
+  const cleanupCall = () => {
+    setCallActive(false);
+    setIsIncomingCall(false);
+    setCallerId(null);
+    setCallSDP(null);
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => track.stop());
+      localStreamRef.current = null;
+    }
+    setLocalStream(null);
+    setRemoteStream(null);
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    iceCandidatesQueue.current = [];
+  };
+
+  // Establish WebSocket connection
   useEffect(() => {
-    if (!token || !selectedId) return;
-    let active = true;
-    const poll = () => {
-      void api.getConversation(token, selectedId).then((conv) => {
-        if (!active) return;
-        setConversations((prev) => prev.map((c) => c.id === conv.id ? conv : c));
-        setTimeout(poll, 5000);
-      }).catch(() => {
-        if (active) setTimeout(poll, 10000); // Back off on error
-      });
+    if (!token) return;
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+    const wsBase = apiBase.replace(/^http/, "ws");
+    const wsUrl = `${wsBase}/chat/ws/${token}`;
+
+    console.log("Connecting to WebSocket:", wsUrl);
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log("WebSocket connected successfully.");
     };
-    const timerId = setTimeout(poll, 5000);
-    return () => { active = false; clearTimeout(timerId); };
-  }, [token, selectedId]);
+
+    ws.onmessage = async (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("WebSocket message received:", data);
+
+        if (data.type === "chat_message") {
+          const newMsg = data.message;
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.id === newMsg.conversation_id) {
+                const exists = c.messages.some((m) => m.id === newMsg.id);
+                return {
+                  ...c,
+                  messages: exists ? c.messages : [...c.messages, newMsg],
+                };
+              }
+              return c;
+            })
+          );
+        } else if (data.type === "rtc_offer") {
+          setCallerId(data.sender_user_id);
+          setCallerName("Đối tác gọi video");
+          setCallSDP(data.sdp);
+          setIsIncomingCall(true);
+        } else if (data.type === "rtc_answer") {
+          if (pcRef.current) {
+            await pcRef.current.setRemoteDescription(new RTCSessionDescription(data.sdp));
+            while (iceCandidatesQueue.current.length > 0) {
+              const cand = iceCandidatesQueue.current.shift();
+              await pcRef.current.addIceCandidate(new RTCIceCandidate(cand));
+            }
+          }
+        } else if (data.type === "rtc_ice_candidate") {
+          const cand = data.candidate;
+          if (pcRef.current && pcRef.current.remoteDescription) {
+            await pcRef.current.addIceCandidate(new RTCIceCandidate(cand));
+          } else {
+            iceCandidatesQueue.current.push(cand);
+          }
+        } else if (data.type === "rtc_hangup") {
+          cleanupCall();
+        }
+      } catch (err) {
+        console.error("Error processing ws message:", err);
+      }
+    };
+
+    ws.onclose = () => {
+      console.log("WebSocket disconnected.");
+    };
+
+    ws.onerror = (err) => {
+      console.warn("WebSocket connection error:", err);
+    };
+
+
+    return () => {
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [token]);
+
+  const startCall = async () => {
+    if (!selected || !wsRef.current) return;
+    const otherParticipant = selected.participants.find((p) => p.id !== user?.id);
+    if (!otherParticipant) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      setCallActive(true);
+
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+      });
+      pcRef.current = pc;
+
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && wsRef.current) {
+          wsRef.current.send(JSON.stringify({
+            type: "rtc_ice_candidate",
+            target_user_id: otherParticipant.id,
+            candidate: event.candidate
+          }));
+        }
+      };
+
+      pc.ontrack = (event) => {
+        setRemoteStream(event.streams[0]);
+      };
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      wsRef.current.send(JSON.stringify({
+        type: "rtc_offer",
+        target_user_id: otherParticipant.id,
+        sdp: offer
+      }));
+    } catch (err) {
+      console.error("Failed to start call:", err);
+      showToast("Không thể khởi động camera/micro: " + (err instanceof Error ? err.message : ""), "danger");
+      cleanupCall();
+    }
+  };
+
+  const acceptCall = async () => {
+    if (!callerId || !callSDP || !wsRef.current) return;
+    setIsIncomingCall(false);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      setCallActive(true);
+
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+      });
+      pcRef.current = pc;
+
+      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate && wsRef.current) {
+          wsRef.current.send(JSON.stringify({
+            type: "rtc_ice_candidate",
+            target_user_id: callerId,
+            candidate: event.candidate
+          }));
+        }
+      };
+
+      pc.ontrack = (event) => {
+        setRemoteStream(event.streams[0]);
+      };
+
+      await pc.setRemoteDescription(new RTCSessionDescription(callSDP));
+
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      wsRef.current.send(JSON.stringify({
+        type: "rtc_answer",
+        target_user_id: callerId,
+        sdp: answer
+      }));
+
+      while (iceCandidatesQueue.current.length > 0) {
+        const cand = iceCandidatesQueue.current.shift();
+        await pc.addIceCandidate(new RTCIceCandidate(cand));
+      }
+    } catch (err) {
+      console.error("Failed to accept call:", err);
+      showToast("Không thể khởi động camera/micro: " + (err instanceof Error ? err.message : ""), "danger");
+      rejectCall();
+    }
+  };
+
+  const rejectCall = () => {
+    if (callerId && wsRef.current) {
+      wsRef.current.send(JSON.stringify({
+        type: "rtc_hangup",
+        target_user_id: callerId
+      }));
+    }
+    cleanupCall();
+  };
+
+  const endCall = () => {
+    if (!selected || !wsRef.current) {
+      cleanupCall();
+      return;
+    }
+    const otherParticipant = selected.participants.find((p) => p.id !== user?.id);
+    if (otherParticipant) {
+      wsRef.current.send(JSON.stringify({
+        type: "rtc_hangup",
+        target_user_id: otherParticipant.id
+      }));
+    }
+    cleanupCall();
+  };
 
   if (!token) {
     return (
@@ -88,15 +306,50 @@ export default function InboxPage() {
     if (!selected || !messageText.trim()) return;
     setSending(true);
     try {
-      await api.sendMessage(token, { conversation_id: selected.id, content: messageText });
-      setMessageText("");
-      // Refresh just this conversation
-      const updated = await api.getConversation(token, selected.id);
-      setConversations((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "chat_message",
+          conversation_id: selected.id,
+          content: messageText
+        }));
+        setMessageText("");
+      } else {
+        await api.sendMessage(token, { conversation_id: selected.id, content: messageText });
+        setMessageText("");
+        const updated = await api.getConversation(token, selected.id);
+        setConversations((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Không thể gửi tin nhắn.", "danger");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSendImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selected || !e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    setUploadingImage(true);
+    try {
+      const res = await api.uploadMedia(token, file);
+      const imageUrl = `![IMAGE](${res.url})`;
+      
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: "chat_message",
+          conversation_id: selected.id,
+          content: imageUrl
+        }));
+      } else {
+        await api.sendMessage(token, { conversation_id: selected.id, content: imageUrl });
+        const updated = await api.getConversation(token, selected.id);
+        setConversations((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+      }
+      showToast("Đã gửi hình ảnh thành công!", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Không thể gửi hình ảnh.", "danger");
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -235,7 +488,7 @@ export default function InboxPage() {
           {selected ? (
             <>
               {/* Chat header */}
-              <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-card)" }}>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-card)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div className="conversation-avatar" style={{ width: 36, height: 36, fontSize: 14 }}>
                     {getInitials(
@@ -250,6 +503,17 @@ export default function InboxPage() {
                     </div>
                   </div>
                 </div>
+                {selected.participants.some((p) => p.id !== user?.id) && (
+                  <button 
+                    className="button secondary sm" 
+                    type="button"
+                    onClick={startCall} 
+                    style={{ display: "flex", alignItems: "center", gap: 6 }}
+                    title="Gọi video WebRTC"
+                  >
+                    <Video size={16} /> Gọi Video
+                  </button>
+                )}
               </div>
 
               {/* Messages */}
@@ -267,6 +531,7 @@ export default function InboxPage() {
                       const prevMsg = selected.messages[idx - 1];
                       const showDateSep = !prevMsg || new Date(msg.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString();
                       const showAvatar = !isSent && (!selected.messages[idx + 1] || selected.messages[idx + 1].sender_id !== msg.sender_id);
+                      const isImg = msg.content.startsWith("![IMAGE]");
 
                       return (
                         <div key={msg.id}>
@@ -307,8 +572,23 @@ export default function InboxPage() {
                                     🗑️
                                   </button>
                                 )}
-                                <div className={`message-bubble ${isSent ? "sent" : "received"}`} style={{ fontStyle: msg.content === "Tin nhắn đã bị thu hồi" ? "italic" : "normal", color: msg.content === "Tin nhắn đã bị thu hồi" ? "var(--text-tertiary)" : "inherit" }}>
-                                  {msg.content}
+                                <div 
+                                  className={`message-bubble ${isSent ? "sent" : "received"}`} 
+                                  style={{ 
+                                    fontStyle: msg.content === "Tin nhắn đã bị thu hồi" ? "italic" : "normal", 
+                                    color: msg.content === "Tin nhắn đã bị thu hồi" ? "var(--text-tertiary)" : "inherit",
+                                    padding: isImg ? "6px" : undefined
+                                  }}
+                                >
+                                  {isImg ? (
+                                    <img 
+                                      src={msg.content.match(/\((.*?)\)/)?.[1] || ""} 
+                                      alt="Shared image" 
+                                      style={{ maxWidth: "250px", maxHeight: "250px", borderRadius: "8px", display: "block" }} 
+                                    />
+                                  ) : (
+                                    msg.content
+                                  )}
                                 </div>
                               </div>
                               <div className="message-meta" style={{ textAlign: isSent ? "right" : "left", paddingLeft: 4, paddingRight: 4 }}>
@@ -325,16 +605,39 @@ export default function InboxPage() {
               </div>
 
               {/* Input */}
-              <div className="chat-input-area">
+              <div className="chat-input-area" style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px" }}>
+                <label 
+                  style={{ 
+                    cursor: uploadingImage ? "not-allowed" : "pointer", 
+                    opacity: uploadingImage ? 0.5 : 1, 
+                    display: "flex", 
+                    alignItems: "center", 
+                    justifyContent: "center",
+                    padding: 8,
+                    borderRadius: "var(--radius-full)",
+                    backgroundColor: "var(--bg-inset)"
+                  }}
+                  title="Gửi hình ảnh"
+                >
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleSendImage} 
+                    disabled={uploadingImage} 
+                    style={{ display: "none" }} 
+                  />
+                  <Image size={18} />
+                </label>
                 <textarea
-                  placeholder="Nhập tin nhắn... (Enter để gửi)"
+                  placeholder={uploadingImage ? "Đang tải ảnh..." : "Nhập tin nhắn... (Enter để gửi)"}
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  disabled={uploadingImage}
                   rows={1}
-                  style={{ minHeight: 40, maxHeight: 100 }}
+                  style={{ minHeight: 40, maxHeight: 100, flex: 1, resize: "none" }}
                 />
-                <button className="button primary sm" type="button" onClick={handleSend} disabled={sending || !messageText.trim()}>
+                <button className="button primary sm" type="button" onClick={handleSend} disabled={sending || uploadingImage || !messageText.trim()}>
                   {sending ? "..." : "Gửi →"}
                 </button>
               </div>
@@ -348,6 +651,94 @@ export default function InboxPage() {
           )}
         </div>
       </div>
+
+      {/* WebRTC Video Call Overlay Modal */}
+      {callActive && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.95)", backdropFilter: "blur(12px)",
+          zIndex: 9999, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", color: "white", padding: 20
+        }}>
+          <div style={{ width: "100%", maxWidth: 900, display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ color: "white", margin: 0 }}>📞 Cuộc gọi Video WebRTC</h2>
+              <span style={{ fontSize: 11, background: "var(--success)", color: "white", padding: "4px 8px", borderRadius: 4, fontWeight: "bold" }}>
+                LAN P2P
+              </span>
+            </div>
+            
+            <div className="grid two" style={{ gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+              {/* Local Stream */}
+              <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "#1e293b", height: 350 }}>
+                <video 
+                  ref={(el) => { if (el) el.srcObject = localStream; }} 
+                  autoPlay 
+                  playsInline 
+                  muted 
+                  style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} 
+                />
+                <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
+                  Bạn (Local camera)
+                </div>
+              </div>
+              
+              {/* Remote Stream */}
+              <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "#1e293b", height: 350 }}>
+                {remoteStream ? (
+                  <video 
+                    ref={(el) => { if (el) el.srcObject = remoteStream; }} 
+                    autoPlay 
+                    playsInline 
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                  />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)" }}>
+                    <div className="spinner" style={{ marginBottom: 15 }} />
+                    <span>Đang chờ đối phương kết nối...</span>
+                  </div>
+                )}
+                <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
+                  Đối tác (Remote video)
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "center", gap: 15, marginTop: 10 }}>
+              <button className="button danger" onClick={endCall} style={{ display: "flex", alignItems: "center", gap: 6, padding: "12px 24px" }}>
+                <PhoneOff size={18} /> Gác máy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Incoming Call Ringing Overlay */}
+      {isIncomingCall && (
+        <div style={{
+          position: "fixed", top: 20, right: 20, width: 320,
+          background: "var(--bg-card)", border: "2px solid var(--primary)",
+          borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+          zIndex: 10000, padding: 16, display: "flex", flexDirection: "column", gap: 12,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: "rgba(99, 102, 241, 0.15)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+              📞
+            </div>
+            <div>
+              <div style={{ fontWeight: 600 }}>{callerName}</div>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Cuộc gọi video tới...</div>
+            </div>
+          </div>
+          
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button className="button secondary sm" onClick={rejectCall}>Từ chối</button>
+            <button className="button primary sm" onClick={acceptCall} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <Phone size={14} /> Trả lời
+            </button>
+          </div>
+        </div>
+      )}
     </PageShell>
   );
 }

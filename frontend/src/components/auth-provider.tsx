@@ -37,10 +37,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Read localStorage only after client mount to avoid hydration mismatch
   useEffect(() => {
     const stored = readStoredAuth();
-    setToken(stored.token);
-    setUser(stored.user);
-    setMounted(true);
+    if (stored.token) {
+      api.me(stored.token)
+        .then((nextUser) => {
+          setToken(stored.token);
+          setUser(nextUser);
+          window.localStorage.setItem("auth_user", JSON.stringify(nextUser));
+          setMounted(true);
+        })
+        .catch((err) => {
+          // Only log out if the token is verified as invalid (401/403)
+          // For network/offline errors, preserve session.
+          if (err && (err.status === 401 || err.status === 403)) {
+            window.localStorage.removeItem("auth_token");
+            window.localStorage.removeItem("auth_user");
+            setToken(null);
+            setUser(null);
+          } else {
+            setToken(stored.token);
+            setUser(stored.user);
+          }
+          setMounted(true);
+        });
+    } else {
+      setMounted(true);
+    }
   }, []);
+
 
   const setSession = (nextToken: string, nextUser: User) => {
     window.localStorage.setItem("auth_token", nextToken);

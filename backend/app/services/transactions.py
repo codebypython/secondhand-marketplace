@@ -254,6 +254,11 @@ def update_delivery_status(session: Session, actor: User, deal_id: str, payload:
     session.refresh(deal)
     return deal
 
+from app.services.notification import create_notification
+from app.services.audit import log_activity
+from app.models.enums import NotificationType
+
+
 def file_dispute(session: Session, actor: User, deal_id: str, payload: DealDisputeCreate) -> Deal:
     deal = get_deal_or_error(session, deal_id)
     if deal.buyer_id != actor.id:
@@ -266,6 +271,25 @@ def file_dispute(session: Session, actor: User, deal_id: str, payload: DealDispu
     session.add(deal)
     session.commit()
     session.refresh(deal)
+    
+    # Notify seller
+    create_notification(
+        session,
+        recipient_id=str(deal.seller_id),
+        type=NotificationType.SYSTEM,
+        title="Khiếu nại được tạo cho giao dịch",
+        message=f"Người mua đã khiếu nại giao dịch cho sản phẩm này. Lý do: {payload.reason}.",
+        link="/dashboard/offers"
+    )
+    # Log activity
+    log_activity(
+        session,
+        actor_id=str(actor.id),
+        verb="file_dispute",
+        target_type="Deal",
+        target_id=str(deal.id),
+        details={"reason": payload.reason}
+    )
     return deal
 
 def schedule_meetup(session: Session, actor: User, payload: MeetupCreate) -> Meetup:
@@ -278,7 +302,29 @@ def schedule_meetup(session: Session, actor: User, payload: MeetupCreate) -> Mee
     session.add(meetup)
     session.commit()
     session.refresh(meetup)
+    
+    # Notify counterparty
+    recipient_id = str(deal.buyer_id) if actor.id == deal.seller_id else str(deal.seller_id)
+    addr = payload.location.get("address") if payload.location else "địa điểm đã thỏa thuận"
+    create_notification(
+        session,
+        recipient_id=recipient_id,
+        type=NotificationType.MEETUP_SCHEDULED,
+        title="Lịch hẹn gặp mới được thiết lập",
+        message=f"Đối tác giao dịch đã đặt lịch hẹn gặp vào lúc {payload.scheduled_at} tại {addr}.",
+        link="/dashboard/offers"
+    )
+    # Log activity
+    log_activity(
+        session,
+        actor_id=str(actor.id),
+        verb="schedule_meetup",
+        target_type="Meetup",
+        target_id=str(meetup.id),
+        details={"deal_id": str(deal.id)}
+    )
     return meetup
+
 
 def check_in_meetup(session: Session, actor: User, meetup_id: str) -> Meetup:
     stmt = select(Meetup).options(selectinload(Meetup.deal)).where(Meetup.id == meetup_id)

@@ -53,6 +53,7 @@ class Listing(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin, VersionMixin):
     has_warranty: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
     location_data: Mapped[dict[str, Any] | None] = mapped_column(JSONBSqlType)
     image_urls: Mapped[list[str]] = mapped_column(JSONBSqlType, default=list, nullable=False)
+    video_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     status: Mapped[ListingStatus] = mapped_column(
         SAEnum(ListingStatus, name="listing_status"),
         default=ListingStatus.AVAILABLE,

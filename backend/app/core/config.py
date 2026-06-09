@@ -16,6 +16,16 @@ class Settings(BaseSettings):
     jwt_secret_key: str = "change-me-in-dev-please-use-at-least-32-bytes"
     access_token_expire_minutes: int = 120
     backend_cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    ai_service_url: str = "http://localhost:8002"
+    ai_confidence_threshold: float = 0.5
+
+    # SMTP Configuration for Real Emails
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from_email: str | None = None
+
 
 
 @lru_cache

@@ -9,7 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Listing, Wishlist } from "@/lib/types";
-import { conditionLabels, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
+import { conditionLabels, formatPrice, getInitials, statusLabels, timeAgo, getMediaUrl } from "@/lib/utils";
 import { ImageCropperModal } from "@/components/ui/image-cropper-modal";
 
 export default function ProfilePage() {
@@ -236,6 +236,18 @@ export default function ProfilePage() {
   const activeListings = myListings.filter((l) => l.status === "AVAILABLE");
   const soldListings = myListings.filter((l) => l.status === "SOLD");
 
+  const handleToggleLiveProduct = async (listing: Listing) => {
+    if (!token) return;
+    try {
+      const updatedValue = !listing.in_live_room;
+      await api.updateListing(token, listing.id, { in_live_room: updatedValue });
+      showToast(updatedValue ? `Đã thêm "${listing.title}" vào phòng live!` : `Đã gỡ "${listing.title}" khỏi phòng live.`, "success");
+      setMyListings(prev => prev.map(l => l.id === listing.id ? { ...l, in_live_room: updatedValue } : l));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Thao tác thất bại", "danger");
+    }
+  };
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
@@ -423,7 +435,7 @@ export default function ProfilePage() {
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 {avatarUrl && (
                   <img
-                    src={avatarUrl}
+                    src={getMediaUrl(avatarUrl)}
                     alt="Avatar Preview"
                     style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--border)" }}
                   />
@@ -446,7 +458,7 @@ export default function ProfilePage() {
               <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                 {bannerUrl && (
                   <img
-                    src={bannerUrl}
+                    src={getMediaUrl(bannerUrl)}
                     alt="Banner Preview"
                     style={{ width: 80, height: 40, borderRadius: "var(--radius-sm)", objectFit: "cover", border: "1px solid var(--border)" }}
                   />
@@ -523,6 +535,22 @@ export default function ProfilePage() {
                         <div className="inline">
                           <span className="badge">{conditionLabels[listing.condition] ?? listing.condition}</span>
                           <span className="price-sm">{formatPrice(listing.price)} ₫</span>
+                          
+                          {listing.status === "AVAILABLE" && (
+                            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, cursor: "pointer", marginLeft: 16 }}>
+                              <input
+                                type="checkbox"
+                                checked={listing.in_live_room || false}
+                                onChange={() => handleToggleLiveProduct(listing)}
+                                style={{ width: 14, height: 14, cursor: "pointer", accentColor: "var(--color-peach)" }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                              <span style={{ color: listing.in_live_room ? "var(--color-peach)" : "var(--text-secondary)" }}>
+                                📺 Live Room
+                              </span>
+                            </label>
+                          )}
+                          
                           <span className="muted" style={{ fontSize: 11, marginLeft: "auto" }}>{timeAgo(listing.created_at)}</span>
                         </div>
                       </div>

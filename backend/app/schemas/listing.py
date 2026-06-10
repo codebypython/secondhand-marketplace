@@ -32,6 +32,7 @@ class ListingCreate(BaseModel):
     condition: ItemCondition = ItemCondition.USED
     brand: str | None = Field(default=None, max_length=255)
     has_warranty: bool = False
+    in_live_room: bool = False
     location_data: dict | None = None
     image_urls: list[str] = Field(default_factory=list)
     video_url: str | None = Field(default=None, max_length=1024)
@@ -45,6 +46,7 @@ class ListingUpdate(BaseModel):
     condition: ItemCondition | None = None
     brand: str | None = Field(default=None, max_length=255)
     has_warranty: bool | None = None
+    in_live_room: bool | None = None
     location_data: dict | None = None
     image_urls: list[str] | None = None
     video_url: str | None = Field(default=None, max_length=1024)
@@ -61,6 +63,7 @@ class ListingRead(ORMModel):
     condition: ItemCondition
     brand: str | None = None
     has_warranty: bool = False
+    in_live_room: bool = False
     location_data: dict | None = None
     image_urls: list[str]
     video_url: str | None = None

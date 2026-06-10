@@ -43,12 +43,15 @@ def get_public_profile(
 @router.get("/{user_id}/listings", response_model=list[ListingRead])
 def get_user_listings(
     user_id: UUID,
+    in_live_room: bool | None = None,
     session: Session = Depends(get_db_session),
 ) -> Any:
     stmt = (
         select(Listing)
         .options(selectinload(Listing.owner).selectinload(User.profile), selectinload(Listing.category))
         .where(Listing.owner_id == user_id)
-        .order_by(Listing.created_at.desc())
     )
+    if in_live_room is not None:
+        stmt = stmt.where(Listing.in_live_room == in_live_room)
+    stmt = stmt.order_by(Listing.created_at.desc())
     return list(session.scalars(stmt).unique())

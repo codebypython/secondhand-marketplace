@@ -62,3 +62,14 @@ export const statusLabels: Record<string, string> = {
   SOLD: "Đã bán",
   HIDDEN: "Ẩn",
 };
+
+export function getMediaUrl(url: string | undefined | null): string {
+  if (!url) return "/placeholder.jpg";
+  if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+    return url;
+  }
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+  const host = apiBase.replace("/api/v1", "");
+  const path = url.startsWith("/") ? url : `/${url}`;
+  return `${host}${path}`;
+}

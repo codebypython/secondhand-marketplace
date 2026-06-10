@@ -42,7 +42,6 @@ async def upload_file(
             detail=f"Could not save file: {str(e)}"
         )
 
-    # Trả về URL đầy đủ phục vụ kiểm duyệt AI và hiển thị Next.js
-    base_url = str(request.base_url).rstrip("/")
-    url = f"{base_url}/static/uploads/{unique_filename}"
+    # Trả về đường dẫn tương đối để tránh IP bị thay đổi
+    url = f"/static/uploads/{unique_filename}"
     return {"url": url}

@@ -3,6 +3,7 @@ import { Listing } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
 import WishlistButton from './WishlistButton';
 import styles from './ProductCard.module.css';
+import { getMediaUrl } from '@/lib/utils';
 
 const conditionLabels: Record<string, string> = {
   NEW: "Mới",
@@ -31,7 +32,7 @@ export interface ProductCardProps {
 }
 
 export const ProductCard: React.FC<ProductCardProps> = ({ listing, onClick }) => {
-  const firstImage = listing.image_urls?.[0] || '/placeholder.jpg';
+  const firstImage = getMediaUrl(listing.image_urls?.[0]);
   const ownerName = listing.owner?.profile?.display_name || listing.owner?.email || 'Unknown';
   const ownerInitial = ownerName.charAt(0).toUpperCase();
 

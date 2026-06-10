@@ -9,7 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Listing } from "@/lib/types";
-import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
+import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo, getMediaUrl } from "@/lib/utils";
 import { LocationDisplay } from "@/components/location-display";
 import { Video, Tv, X } from "lucide-react";
 import WishlistButton from "@/components/product/WishlistButton";
@@ -472,7 +472,7 @@ export default function ListingDetailPage() {
               <div
                 className={styles.mainImage}
                 style={{
-                  backgroundImage: `url(${listing.image_urls[currentImage]})`,
+                  backgroundImage: `url(${getMediaUrl(listing.image_urls[currentImage])})`,
                 }}
               />
               {listing.image_urls.length > 1 ? (
@@ -484,7 +484,7 @@ export default function ListingDetailPage() {
                       onClick={() => setCurrentImage(i)}
                       className={`${styles.thumbnail} ${i === currentImage ? styles.activeThumbnail : ""}`}
                       style={{
-                        backgroundImage: `url(${url})`,
+                        backgroundImage: `url(${getMediaUrl(url)})`,
                       }}
                     />
                   ))}

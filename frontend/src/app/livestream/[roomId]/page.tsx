@@ -3,12 +3,13 @@
 import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Heart, Send, AlertTriangle, Volume2, VolumeX, MessageSquare, MessageSquareOff, Maximize, Minimize } from "lucide-react";
+import { Heart, Send, AlertTriangle, Volume2, VolumeX, MessageSquare, MessageSquareOff, Maximize, Minimize, Plus, Trash2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/hooks/useAuth";
 import type { Listing } from "@/lib/types";
 import WishlistButton from "@/components/product/WishlistButton";
 import { showToast } from "@/components/toast";
+import { getMediaUrl } from "@/lib/utils";
 
 interface FloatingHeart {
   id: number;
@@ -21,6 +22,11 @@ export default function LivestreamRoomPage() {
   const { token, user } = useAuth();
 
   const [roomDetail, setRoomDetail] = useState<any>(null);
+  const isHost = roomDetail ? user?.id === roomDetail.user_id : false;
+  
+  const [allHostListings, setAllHostListings] = useState<Listing[]>([]);
+  const [showManageProducts, setShowManageProducts] = useState(false);
+
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loadingListings, setLoadingListings] = useState(true);
@@ -111,8 +117,8 @@ export default function LivestreamRoomPage() {
       .then((room) => {
         setRoomDetail(room);
 
-        // Fetch streamer's listings
-        api.getUserListings(room.user_id)
+        // Fetch streamer's active livestream room listings (in_live_room = true)
+        api.getUserListings(room.user_id, true)
           .then((listingsData) => {
             setListings(listingsData);
             setLoadingListings(false);
@@ -121,6 +127,17 @@ export default function LivestreamRoomPage() {
             console.error("Failed to load listings:", err);
             setLoadingListings(false);
           });
+
+        // Load all streamer's inventory for host CRUD management
+        if (user?.id === room.user_id) {
+          api.getUserListings(room.user_id)
+            .then((allData) => {
+              setAllHostListings(allData);
+            })
+            .catch((err) => {
+              console.error("Failed to load all host listings:", err);
+            });
+        }
 
         // Fetch comments
         api.getLiveComments(params.roomId)
@@ -138,7 +155,7 @@ export default function LivestreamRoomPage() {
         showToast("Phòng livestream không tồn tại hoặc đã bị tắt.", "danger");
         router.push("/livestream");
       });
-  }, [token, params.roomId]);
+  }, [token, params.roomId, user?.id]);
 
   // 3. WebRTC and WebSocket Connection Logic
   useEffect(() => {
@@ -402,6 +419,55 @@ export default function LivestreamRoomPage() {
     };
   }, [token, roomDetail]);
 
+  // Bind the stream to the video element without flickering on each render
+  useEffect(() => {
+    const el = videoRef.current;
+    if (el) {
+      const activeStream = isHost ? localStream : remoteStream;
+      if (el.srcObject !== activeStream) {
+        el.srcObject = activeStream;
+      }
+    }
+  }, [localStream, remoteStream, isHost]);
+
+  // Host product toggling and deletion
+  const handleToggleLiveProduct = async (item: Listing) => {
+    if (!token) return;
+    try {
+      const updatedValue = !item.in_live_room;
+      await api.updateListing(token, item.id, { in_live_room: updatedValue });
+      showToast(updatedValue ? `Đã thêm "${item.title}" vào live!` : `Đã gỡ "${item.title}" khỏi live.`, "success");
+      
+      setAllHostListings(prev => prev.map(l => l.id === item.id ? { ...l, in_live_room: updatedValue } : l));
+      
+      if (updatedValue) {
+        setListings(prev => {
+          if (prev.some(l => l.id === item.id)) return prev;
+          return [...prev, { ...item, in_live_room: updatedValue }];
+        });
+      } else {
+        setListings(prev => prev.filter(l => l.id !== item.id));
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Thao tác thất bại", "danger");
+    }
+  };
+
+  const handleDeleteLiveProduct = async (itemId: string) => {
+    if (!token) return;
+    if (!window.confirm("Bạn có chắc chắn muốn xóa vĩnh viễn sản phẩm này khỏi hệ thống?")) return;
+    
+    try {
+      await api.deleteListing(token, itemId);
+      showToast("Đã xóa sản phẩm thành công", "success");
+      
+      setAllHostListings(prev => prev.filter(l => l.id !== itemId));
+      setListings(prev => prev.filter(l => l.id !== itemId));
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Xóa sản phẩm thất bại", "danger");
+    }
+  };
+
   if (!token) {
     return (
       <div style={{
@@ -435,8 +501,6 @@ export default function LivestreamRoomPage() {
       </div>
     );
   }
-
-  const isHost = user?.id === roomDetail.user_id;
 
   // Helper date formatter
   const formatDate = (dateStr: string) => {
@@ -550,7 +614,7 @@ export default function LivestreamRoomPage() {
           
           <div className="livestream-streamer-avatar" style={{ width: 32, height: 32, fontSize: 13, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--accent)", color: "white", fontWeight: "bold" }}>
             {roomDetail.user?.profile?.avatar_url ? (
-              <img src={roomDetail.user.profile.avatar_url} alt={streamerName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src={getMediaUrl(roomDetail.user.profile.avatar_url)} alt={streamerName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : initials}
           </div>
           <div>
@@ -574,17 +638,7 @@ export default function LivestreamRoomPage() {
             onMouseLeave={() => setShowControls(false)}
           >
             <video
-              ref={(el) => {
-                // @ts-ignore
-                videoRef.current = el;
-                if (el) {
-                  if (isHost) {
-                    el.srcObject = localStream;
-                  } else {
-                    el.srcObject = remoteStream;
-                  }
-                }
-              }}
+              ref={videoRef}
               className="live-video-placeholder"
               autoPlay
               playsInline
@@ -748,11 +802,21 @@ export default function LivestreamRoomPage() {
 
           {/* Product List Panel (Horizontal Scroll below video) */}
           <div className="live-sidebar-panel" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <div className="panel-header">
-              <h3 className="panel-header-title">🛍️ Sản phẩm đang bán</h3>
-              <span className="badge" style={{ fontSize: 11, background: "rgba(249, 177, 122, 0.12)", color: "var(--color-peach)" }}>
+            <div className="panel-header" style={{ display: "flex", alignItems: "center", width: "100%" }}>
+              <h3 className="panel-header-title" style={{ margin: 0 }}>🛍️ Sản phẩm đang bán</h3>
+              <span className="badge" style={{ fontSize: 11, background: "rgba(249, 177, 122, 0.12)", color: "var(--color-peach)", marginLeft: 6 }}>
                 {listings.length} món
               </span>
+              {isHost && (
+                <button
+                  type="button"
+                  className="button primary sm"
+                  onClick={() => setShowManageProducts(true)}
+                  style={{ marginLeft: "auto", fontSize: 12, padding: "4px 10px", background: "var(--color-peach)", color: "var(--color-navy)" }}
+                >
+                  ⚙️ Quản lý
+                </button>
+              )}
             </div>
 
             <div className="panel-content custom-scrollbar" style={{ display: "flex", flexDirection: "row", gap: 12, overflowX: "auto", overflowY: "hidden", flexWrap: "nowrap", padding: "12px 16px" }}>
@@ -763,13 +827,13 @@ export default function LivestreamRoomPage() {
                 </div>
               ) : listings.length === 0 ? (
                 <p className="muted" style={{ fontSize: 13, textAlign: "center", width: "100%", padding: 12 }}>
-                  Không có sản phẩm nào của shop này.
+                  Không có sản phẩm nào trong phòng livestream.
                 </p>
               ) : (
                 listings.map((item) => (
                   <div key={item.id} className="sidebar-product-item" style={{ display: "flex", flexShrink: 0, width: 280, gap: 10, padding: 8, alignItems: "center" }}>
                     <img
-                      src={item.image_urls?.[0] || "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=80&q=80"}
+                      src={getMediaUrl(item.image_urls?.[0])}
                       alt={item.title}
                       className="sidebar-product-img"
                       onError={(e) => {
@@ -873,6 +937,94 @@ export default function LivestreamRoomPage() {
         )}
 
       </div>
+
+      {/* Host products management modal */}
+      {showManageProducts && isHost && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(10, 11, 20, 0.75)", backdropFilter: "blur(12px)",
+          zIndex: 10001, display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+        }} onClick={() => setShowManageProducts(false)}>
+          <div className="card" style={{ width: "95%", maxWidth: 520, background: "var(--bg-card)", margin: 0, border: "1px solid var(--border)", padding: 24, borderRadius: "var(--radius-lg)", display: "flex", flexDirection: "column", gap: 18, maxHeight: "85vh" }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "var(--text)" }}>⚙️ Quản lý sản phẩm Livestream</h3>
+              <button
+                type="button"
+                className="button ghost sm"
+                onClick={() => setShowManageProducts(false)}
+                style={{ padding: 6, borderRadius: "50%", minWidth: "auto" }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, paddingRight: 4 }} className="custom-scrollbar">
+              {allHostListings.length === 0 ? (
+                <p className="muted" style={{ textAlign: "center", fontSize: 13 }}>Chưa có sản phẩm nào. Hãy đăng sản phẩm mới!</p>
+              ) : (
+                allHostListings.map((item) => (
+                  <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 12, padding: 10, background: "var(--bg-inset)", borderRadius: "var(--radius)", border: "1px solid rgba(255,255,255,0.02)" }}>
+                    <img
+                      src={getMediaUrl(item.image_urls?.[0])}
+                      alt={item.title}
+                      style={{ width: 44, height: 44, borderRadius: 8, objectFit: "cover" }}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 50 50%22%3E%3Crect fill=%22%23222%22 width=%2250%22 height=%2250%22/%3E%3C/svg%3E";
+                      }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <h4 className="truncate" style={{ fontSize: 13, fontWeight: 600, margin: 0, color: "var(--text)" }}>{item.title}</h4>
+                      <span style={{ fontSize: 12, color: "var(--color-peach)", fontWeight: 500 }}>₫{parseFloat(item.price).toLocaleString("vi-VN")}</span>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, cursor: "pointer" }} title="Hiển thị trong phòng livestream">
+                        <input
+                          type="checkbox"
+                          checked={item.in_live_room || false}
+                          onChange={() => handleToggleLiveProduct(item)}
+                          style={{ cursor: "pointer", width: 14, height: 14, accentColor: "var(--color-peach)" }}
+                        />
+                        <span>Live</span>
+                      </label>
+
+                      <button
+                        type="button"
+                        className="button danger ghost sm"
+                        onClick={() => handleDeleteLiveProduct(item.id)}
+                        style={{ padding: 6, minWidth: "auto", borderRadius: 6 }}
+                        title="Xóa vĩnh viễn sản phẩm"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div style={{ display: "flex", gap: 10, justifyContent: "space-between", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 14 }}>
+              <Link
+                href="/listings/new"
+                target="_blank"
+                className="button secondary sm"
+                style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}
+              >
+                <Plus size={14} /> Thêm sản phẩm mới
+              </Link>
+              <button
+                type="button"
+                className="button primary sm"
+                onClick={() => setShowManageProducts(false)}
+                style={{ fontSize: 12, background: "var(--color-peach)", color: "var(--color-navy)" }}
+              >
+                Hoàn tất
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

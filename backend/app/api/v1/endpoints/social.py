@@ -184,6 +184,19 @@ def add_wishlist_item(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
         
+    # Tự động xóa sản phẩm này khỏi các danh sách yêu thích khác của cùng người dùng
+    other_items = session.scalars(
+        select(WishlistItem)
+        .join(Wishlist)
+        .where(
+            Wishlist.user_id == current_user.id,
+            WishlistItem.listing_id == listing_uuid,
+            WishlistItem.wishlist_id != wishlist_id
+        )
+    ).all()
+    for other_item in other_items:
+        session.delete(other_item)
+
     existing = session.scalar(
         select(WishlistItem).where(
             WishlistItem.wishlist_id == wishlist_id,
@@ -191,6 +204,7 @@ def add_wishlist_item(
         )
     )
     if existing:
+        session.commit() # Save deletions if any
         return existing
         
     item = WishlistItem(wishlist_id=wishlist_id, listing_id=listing_uuid)

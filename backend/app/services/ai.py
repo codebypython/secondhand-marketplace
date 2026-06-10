@@ -32,6 +32,17 @@ def classify_image_via_ai(image_url_or_bytes: str | bytes, filename: str = "imag
                     # Extract filename if possible
                     if "/" in image_url_or_bytes:
                         filename = image_url_or_bytes.split("/")[-1] or filename
+            elif image_url_or_bytes.startswith("/static/uploads/"):
+                # Đọc tệp tin từ ổ đĩa cục bộ
+                import os
+                local_path = image_url_or_bytes.lstrip("/")
+                if os.path.exists(local_path):
+                    with open(local_path, "rb") as f:
+                        image_bytes = f.read()
+                    filename = os.path.basename(local_path)
+                else:
+                    logger.warning("Local file not found for AI classifier: %s", local_path)
+                    return fallback
             else:
                 logger.warning("Invalid image URL format passed to AI classifier: %s", image_url_or_bytes)
                 return fallback

@@ -58,6 +58,7 @@ export interface Listing {
   condition: ItemCondition;
   brand?: string | null;
   has_warranty?: boolean;
+  in_live_room?: boolean;
   location_data?: Record<string, unknown> | null;
   image_urls: string[];
   video_url?: string | null;

@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Heart, Check } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Heart, Check, X, Plus } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useSharedWishlists } from "@/lib/hooks/useSharedWishlists";
+import { Wishlist } from "@/lib/types";
 import { showToast } from "@/components/toast";
 import styles from "./WishlistButton.module.css";
 
@@ -32,27 +34,30 @@ export const WishlistButton: React.FC<WishlistButtonProps> = ({
   const [newListName, setNewListName] = useState("");
   const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
   const [creating, setCreating] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  // Safe client mounting check for Next.js SSR hydration
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent background scroll when modal is open
+  useEffect(() => {
+    if (showPopover) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [showPopover]);
 
   // Check if item is in any wishlist
   const isWishlisted = wishlists.some((wl) =>
     wl.items?.some((item) => item.listing_id === listingId)
   );
-
-  useEffect(() => {
-    if (!showPopover) return;
-
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setShowPopover(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleOutsideClick);
-    return () => {
-      document.removeEventListener("mousedown", handleOutsideClick);
-    };
-  }, [showPopover]);
 
   const handleHeartClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -63,25 +68,36 @@ export const WishlistButton: React.FC<WishlistButtonProps> = ({
       return;
     }
 
-    if (!isWishlisted) {
+    if (isWishlisted) {
       try {
-        if (wishlists.length > 0) {
-          const defaultList = wishlists[0];
-          await addToList(defaultList.id, listingId);
-          showToast(`Đã thêm vào danh sách "${defaultList.name}"!`, "success");
-        } else {
-          const newList = await createList("Yêu thích");
-          if (newList) {
-            await addToList(newList.id, listingId);
-            showToast("Đã tạo và thêm vào danh sách Yêu thích!", "success");
+        const listsWithItem = wishlists.filter((wl) =>
+          wl.items?.some((item) => item.listing_id === listingId)
+        );
+        for (const wl of listsWithItem) {
+          await removeFromList(wl.id, listingId);
+        }
+        showToast("Đã xóa khỏi danh sách yêu thích", "default");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Thao tác thất bại", "danger");
+      }
+    } else {
+      try {
+        let targetList: Wishlist | null = wishlists[0] || null;
+        if (!targetList) {
+          targetList = await createList("Yêu thích");
+        }
+        if (targetList) {
+          await addToList(targetList.id, listingId);
+          showToast(`Đã thêm vào danh sách "${targetList.name}"!`, "success");
+          
+          if (variant === "text") {
+            setShowPopover(true);
           }
         }
       } catch (err) {
         showToast(err instanceof Error ? err.message : "Thao tác thất bại", "danger");
       }
     }
-
-    setShowPopover(!showPopover);
   };
 
   const handleToggleWishlist = async (e: React.MouseEvent, wishlistId: string, hasItem: boolean) => {
@@ -94,10 +110,10 @@ export const WishlistButton: React.FC<WishlistButtonProps> = ({
     try {
       if (hasItem) {
         await removeFromList(wishlistId, listingId);
-        showToast("Đã xóa khỏi Wishlist", "default");
+        showToast("Đã xóa khỏi danh sách", "default");
       } else {
         await addToList(wishlistId, listingId);
-        showToast("Đã thêm vào Wishlist!", "success");
+        showToast("Đã thêm vào danh sách!", "success");
       }
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Thao tác thất bại", "danger");
@@ -117,7 +133,7 @@ export const WishlistButton: React.FC<WishlistButtonProps> = ({
       const newList = await createList(newListName.trim());
       if (newList) {
         await addToList(newList.id, listingId);
-        showToast(`Đã tạo và thêm vào Wishlist "${newListName.trim()}"`, "success");
+        showToast(`Đã tạo và thêm vào "${newListName.trim()}"`, "success");
         setNewListName("");
       }
     } catch (err) {
@@ -136,67 +152,92 @@ export const WishlistButton: React.FC<WishlistButtonProps> = ({
         aria-label="Add to wishlist"
         style={{ display: "flex", alignItems: "center", gap: 6 }}
       >
-        <Heart size={iconSize} fill={isWishlisted ? (variant === "text" ? "#ff4b4b" : "currentColor") : "none"} color={isWishlisted && variant === "text" ? "#ff4b4b" : undefined} />
+        <Heart 
+          size={iconSize} 
+          fill={isWishlisted ? (variant === "text" ? "#ff4b4b" : "currentColor") : "none"} 
+          color={isWishlisted && variant === "text" ? "#ff4b4b" : undefined}
+          className={styles.heartIcon}
+        />
         {variant === "text" && (isWishlisted ? "Đã thích" : "Yêu thích")}
       </button>
 
-      {showPopover && (
-        <div
-          className={`${styles.popover} ${variant === "text" ? styles.popoverLeft : ""}`}
-          ref={popoverRef}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <h4 className={styles.title}>Lưu vào Yêu thích</h4>
-          <div className={styles.list}>
-            {wishlists.length === 0 ? (
-              <p className={styles.emptyText}>Chưa có danh sách nào</p>
-            ) : (
-              wishlists.map((wl) => {
-                const hasItem = wl.items?.some((item) => item.listing_id === listingId) ?? false;
-                const isLoading = loadingMap[wl.id] ?? false;
+      {showPopover && mounted && createPortal(
+        <div className={styles.modalOverlay} onClick={() => setShowPopover(false)}>
+          <div 
+            className={styles.modalContent} 
+            ref={popoverRef}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Visual indicator for mobile bottom sheet swipe */}
+            <div className={styles.dragHandle} />
 
-                return (
-                  <button
-                    key={wl.id}
-                    type="button"
-                    className={`${styles.listItem} ${hasItem ? styles.listItemActive : ""}`}
-                    onClick={(e) => handleToggleWishlist(e, wl.id, hasItem)}
-                    disabled={isLoading}
-                  >
-                    <span className={`${styles.checkbox} ${hasItem ? styles.checkboxActive : ""}`}>
-                      {hasItem && <Check size={10} strokeWidth={3} />}
-                    </span>
-                    <span style={{ flex: 1, textOverflow: "ellipsis", overflow: "hidden", whiteSpace: "nowrap" }}>
-                      {wl.name}
-                    </span>
-                    {isLoading && (
-                      <span className="spinner" style={{ width: 10, height: 10, border: "2px solid var(--color-peach)", borderTopColor: "transparent", borderRadius: "50%", display: "inline-block", animation: "spin 0.6s linear infinite" }} />
-                    )}
-                  </button>
-                );
-              })
-            )}
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Lưu vào Yêu thích</h3>
+              <button
+                type="button"
+                className={styles.btnClose}
+                onClick={() => setShowPopover(false)}
+                aria-label="Close modal"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className={styles.list}>
+              {wishlists.length === 0 ? (
+                <p className={styles.emptyText}>Chưa có danh sách nào</p>
+              ) : (
+                wishlists.map((wl) => {
+                  const hasItem = wl.items?.some((item) => item.listing_id === listingId) ?? false;
+                  const isLoading = loadingMap[wl.id] ?? false;
+
+                  return (
+                    <button
+                      key={wl.id}
+                      type="button"
+                      className={`${styles.listItem} ${hasItem ? styles.listItemActive : ""}`}
+                      onClick={(e) => handleToggleWishlist(e, wl.id, hasItem)}
+                      disabled={isLoading}
+                    >
+                      <span className={`${styles.checkbox} ${hasItem ? styles.checkboxActive : ""}`}>
+                        {hasItem && <Check size={10} strokeWidth={3} />}
+                      </span>
+                      <span className={styles.listName}>
+                        {wl.name}
+                      </span>
+                      {isLoading && (
+                        <span className={styles.spinner} />
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            <form className={styles.createArea} onSubmit={handleCreateList}>
+              <div className={styles.inputWrapper}>
+                <input
+                  type="text"
+                  className={styles.input}
+                  placeholder="Tạo danh sách mới..."
+                  value={newListName}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  disabled={creating}
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+              <button
+                type="submit"
+                className={styles.btnSubmit}
+                disabled={!newListName.trim() || creating}
+              >
+                {creating ? <span className={styles.spinner} style={{ width: 12, height: 12 }} /> : <Plus size={16} />}
+                <span>Tạo</span>
+              </button>
+            </form>
           </div>
-
-          <form className={styles.createArea} onSubmit={handleCreateList}>
-            <input
-              type="text"
-              className={styles.input}
-              placeholder="Tạo danh sách mới..."
-              value={newListName}
-              onChange={(e) => setNewListName(e.target.value)}
-              disabled={creating}
-              onClick={(e) => e.stopPropagation()}
-            />
-            <button
-              type="submit"
-              className={styles.btnSubmit}
-              disabled={!newListName.trim() || creating}
-            >
-              {creating ? "..." : "Tạo"}
-            </button>
-          </form>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

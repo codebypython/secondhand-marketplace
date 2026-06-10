@@ -67,7 +67,8 @@ export const api = {
   updateProfile: (token: string, payload: { full_name?: string; avatar_url?: string; bio?: string; display_name?: string; phone?: string; address?: string; dob?: string; shop_slug?: string; banner_url?: string; lat?: number; lng?: number; }) =>
     request<User>("/users/me", { method: "PATCH", body: JSON.stringify(payload) }, token),
   getUser: (userId: string) => request<UserPublic>(`/users/${userId}`),
-  getUserListings: (userId: string) => request<Listing[]>(`/users/${userId}/listings`),
+  getUserListings: (userId: string, inLiveRoom?: boolean) => 
+    request<Listing[]>(`/users/${userId}/listings${inLiveRoom !== undefined ? `?in_live_room=${inLiveRoom}` : ""}`),
 
   // Listings
   listCategories: () => request<Category[]>("/listings/categories"),

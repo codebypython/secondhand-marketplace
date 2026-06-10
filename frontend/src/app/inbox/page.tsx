@@ -9,7 +9,7 @@ import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Conversation, Message } from "@/lib/types";
 import Link from "next/link";
-import { getInitials, timeAgo, formatPrice } from "@/lib/utils";
+import { getInitials, timeAgo, formatPrice, getMediaUrl } from "@/lib/utils";
 import styles from "./inbox.module.css";
 
 export default function InboxPage() {
@@ -726,7 +726,7 @@ export default function InboxPage() {
                                 >
                                   {isImg ? (
                                     <img 
-                                      src={msg.content.match(/\((.*?)\)/)?.[1] || ""} 
+                                      src={getMediaUrl(msg.content.match(/\((.*?)\)/)?.[1] || "")} 
                                       alt="Shared image" 
                                       style={{ maxWidth: "250px", maxHeight: "250px", borderRadius: "8px", display: "block" }} 
                                     />
@@ -829,7 +829,7 @@ export default function InboxPage() {
                       fontSize: 22, fontWeight: 700, overflow: "hidden"
                     }}>
                       {partner.profile?.avatar_url ? (
-                        <img src={partner.profile.avatar_url} alt="Ảnh đại diện đối tác" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                        <img src={getMediaUrl(partner.profile.avatar_url)} alt="Ảnh đại diện đối tác" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
                       ) : initials}
                     </div>
                     <div>
@@ -884,7 +884,7 @@ export default function InboxPage() {
                   ) : listingDetail ? (
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                       {listingDetail.image_urls?.[0] && (
-                        <img src={listingDetail.image_urls[0]} alt={listingDetail.title} style={{ width: 50, height: 50, borderRadius: 8, objectFit: "cover" }} />
+                        <img src={getMediaUrl(listingDetail.image_urls[0])} alt={listingDetail.title} style={{ width: 50, height: 50, borderRadius: 8, objectFit: "cover" }} />
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <Link href={`/listings/${listingDetail.id}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", textDecoration: "none", display: "block" }} className="truncate">

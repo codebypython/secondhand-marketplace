@@ -23,6 +23,7 @@ class MessageRead(ORMModel):
     conversation_id: UUID
     sender_id: UUID
     content: str
+    status: str
     created_at: datetime
     sender: UserRead | None = None
 

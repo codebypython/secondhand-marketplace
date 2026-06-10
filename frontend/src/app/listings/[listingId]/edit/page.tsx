@@ -35,6 +35,9 @@ export default function EditListingPage() {
   const [hasWarranty, setHasWarranty] = useState(false);
   const [status, setStatus] = useState<ListingStatus>("AVAILABLE");
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingImageIndex, setUploadingImageIndex] = useState<number | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number; address?: string; symbol_type?: string } | null>(null);
   
   const [loading, setLoading] = useState(true);
@@ -66,6 +69,7 @@ export default function EditListingPage() {
       setHasWarranty(item.has_warranty || false);
       setStatus(item.status);
       setImageUrls(item.image_urls.length > 0 ? item.image_urls : [""]);
+      setVideoUrl(item.video_url || "");
       if (item.location_data && typeof item.location_data === "object" && "lat" in item.location_data) {
         setLocation(item.location_data as any);
       }
@@ -106,6 +110,7 @@ export default function EditListingPage() {
         has_warranty: hasWarranty,
         status,
         image_urls: imageUrls.map((u) => u.trim()).filter(Boolean),
+        video_url: videoUrl || null,
         location_data: location ? { lat: location.lat, lng: location.lng, address: location.address, symbol_type: location.symbol_type || "STANDARD" } : null,
       });
       showToast("Cập nhật tin đăng thành công!", "success");
@@ -242,13 +247,45 @@ export default function EditListingPage() {
         <div className="field">
           <label>Hình ảnh (URL)</label>
           {imageUrls.map((url, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 6 }}>
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
               <input
                 placeholder="https://example.com/photo.jpg"
                 value={url}
                 onChange={(e) => updateImageUrl(i, e.target.value)}
                 style={{ flex: 1 }}
               />
+              <label 
+                className="button secondary sm" 
+                style={{ 
+                  cursor: uploadingImageIndex === i ? "not-allowed" : "pointer", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 4,
+                  padding: "6px 12px",
+                  margin: 0
+                }}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    if (!e.target.files || e.target.files.length === 0) return;
+                    setUploadingImageIndex(i);
+                    try {
+                      const res = await api.uploadMedia(token, e.target.files[0]);
+                      updateImageUrl(i, res.url);
+                      showToast("Tải lên ảnh thành công!", "success");
+                    } catch (err) {
+                      showToast(err instanceof Error ? err.message : "Tải lên ảnh thất bại.", "danger");
+                    } finally {
+                      setUploadingImageIndex(null);
+                    }
+                  }}
+                  disabled={uploadingImageIndex === i}
+                  style={{ display: "none" }}
+                />
+                {uploadingImageIndex === i ? "Đang tải..." : "📁 Tải ảnh"}
+              </label>
               {imageUrls.length > 1 ? (
                 <button type="button" className="button ghost sm" onClick={() => removeImageUrl(i)}>✕</button>
               ) : null}
@@ -257,6 +294,45 @@ export default function EditListingPage() {
           <button type="button" className="button ghost sm" onClick={addImageUrl} style={{ alignSelf: "flex-start" }}>
             ＋ Thêm ảnh
           </button>
+        </div>
+
+        <div className="field">
+          <label>Video mô tả sản phẩm (Tùy chọn)</label>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <input
+              placeholder="Chọn hoặc nhập URL video..."
+              value={videoUrl}
+              onChange={(e) => setVideoUrl(e.target.value)}
+              style={{ flex: 1 }}
+            />
+            <label className="button secondary" style={{ cursor: uploadingVideo ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+              <input
+                type="file"
+                accept="video/*"
+                onChange={async (e) => {
+                  if (!e.target.files || e.target.files.length === 0) return;
+                  setUploadingVideo(true);
+                  try {
+                    const res = await api.uploadMedia(token, e.target.files[0]);
+                    setVideoUrl(res.url);
+                    showToast("Tải lên video thành công!", "success");
+                  } catch (err) {
+                    showToast(err instanceof Error ? err.message : "Tải lên video thất bại.", "danger");
+                  } finally {
+                    setUploadingVideo(false);
+                  }
+                }}
+                disabled={uploadingVideo}
+                style={{ display: "none" }}
+              />
+              {uploadingVideo ? "Đang tải..." : "📁 Tải lên Video"}
+            </label>
+          </div>
+          {videoUrl && (
+            <div style={{ marginTop: 10 }}>
+              <video src={videoUrl} controls style={{ maxWidth: "100%", height: 180, borderRadius: 8, border: "1px solid var(--border)" }} />
+            </div>
+          )}
         </div>
 
         <div className="field">

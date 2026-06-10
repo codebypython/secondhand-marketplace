@@ -40,6 +40,15 @@ def create_conversation_endpoint(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.get("/unread-count")
+def get_unread_chat_count(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    from app.services.chat import count_unread_conversations
+    return {"count": count_unread_conversations(session, current_user)}
+
+
 @router.get("/conversations/{conversation_id}", response_model=ConversationRead)
 def get_conversation_endpoint(
     conversation_id: UUID,
@@ -52,6 +61,9 @@ def get_conversation_endpoint(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     if current_user.id not in {participant.id for participant in conversation.participants}:
         raise HTTPException(status_code=403, detail="You are not in this conversation")
+    
+    from app.services.chat import mark_conversation_as_read
+    mark_conversation_as_read(session, conversation_id, current_user)
     
     # Filter messages that are deleted for the current user
     conversation.messages = [msg for msg in conversation.messages if current_user not in msg.deleted_by]
@@ -155,6 +167,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str) -> None:
                 from app.schemas.chat import MessageCreate, MessageRead
                 from app.services.chat import send_message
                 
+                participants = []
                 with SessionFactory() as session:
                     db_user = session.get(User, user_id)
                     try:
@@ -163,25 +176,59 @@ async def websocket_endpoint(websocket: WebSocket, token: str) -> None:
                             db_user, 
                             MessageCreate(conversation_id=conv_id, content=content)
                         )
+                        
+                        from app.services.chat import get_conversation_or_error
+                        conv = get_conversation_or_error(session, conv_id)
+                        participants = [str(p.id) for p in conv.participants]
+                        recipient_id = next((pid for pid in participants if pid != str(user_id)), None)
+                        
+                        if recipient_id and recipient_id in manager.active_connections:
+                            new_msg.status = "delivered"
+                            session.commit()
+                            
                         msg_read = MessageRead.model_validate(new_msg)
                         payload = {
                             "type": "chat_message",
                             "message": msg_read.model_dump(mode="json")
                         }
                     except Exception as e:
+                        from app.core.tracker import log_system_error
+                        log_system_error(
+                            ip=websocket.client.host if websocket.client else "unknown",
+                            method="WS_SEND",
+                            path=f"/ws/chat/{conv_id}",
+                            status_code=400,
+                            detail=str(e),
+                            source="WebSocket Chat / DB"
+                        )
                         await websocket.send_json({"type": "error", "message": str(e)})
                         continue
                 
-                from app.services.chat import get_conversation_or_error
+                for pid in participants:
+                    await manager.send_personal_message(payload, pid)
+            
+            elif msg_type == "read_conversation":
+                conv_id = message_data.get("conversation_id")
+                if not conv_id:
+                    continue
+                
+                from app.services.chat import mark_conversation_as_read, get_conversation_or_error
+                participants = []
                 with SessionFactory() as session:
+                    db_user = session.get(User, user_id)
                     try:
+                        mark_conversation_as_read(session, conv_id, db_user)
                         conv = get_conversation_or_error(session, conv_id)
                         participants = [str(p.id) for p in conv.participants]
                     except Exception:
                         continue
                 
                 for pid in participants:
-                    await manager.send_personal_message(payload, pid)
+                    await manager.send_personal_message({
+                        "type": "messages_read",
+                        "conversation_id": str(conv_id),
+                        "reader_id": str(user_id)
+                    }, pid)
             
             elif msg_type in ("rtc_offer", "rtc_answer", "rtc_ice_candidate", "rtc_hangup"):
                 target_user_id = message_data.get("target_user_id")

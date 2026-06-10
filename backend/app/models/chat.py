@@ -45,6 +45,7 @@ class Message(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
         index=True,
     )
     content: Mapped[str] = mapped_column(String(4000), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="sent", server_default="sent", nullable=False)
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
     sender: Mapped[User] = relationship(back_populates="messages")

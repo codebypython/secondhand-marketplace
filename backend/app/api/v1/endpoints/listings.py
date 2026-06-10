@@ -54,16 +54,49 @@ def search_suggestions(
     session: Session = Depends(get_db_session),
     query: str = Query(..., min_length=2),
 ) -> Any:
-    # A simple implementation: fetch distinct listing titles that match the query
     from sqlalchemy import select
-
-    from app.models.listing import Listing
+    from app.models.listing import Listing, Category
+    from app.services.listings import normalize_text
     
-    stmt = select(Listing.title).where(Listing.title.ilike(f"%{query}%")).limit(10)
-    titles = session.scalars(stmt).all()
-    # Basic dedup
-    suggestions = list(set(titles))
-    return suggestions
+    query_norm = normalize_text(query)
+    if not query_norm:
+        return []
+    
+    # 1. Fetch categories and look for matches
+    cat_stmt = select(Category)
+    categories = session.scalars(cat_stmt).all()
+    
+    cat_suggestions = []
+    for cat in categories:
+        cat_name_norm = normalize_text(cat.name)
+        if query_norm in cat_name_norm:
+            cat_suggestions.append(f"Tìm trong danh mục: {cat.name}")
+            
+    # 2. Fetch active listing titles and look for matches
+    listing_stmt = select(Listing.title).where(Listing.deleted_at.is_(None)).where(Listing.status == ListingStatus.AVAILABLE)
+    all_titles = session.scalars(listing_stmt).all()
+    
+    listing_suggestions = []
+    for title in all_titles:
+        title_norm = normalize_text(title)
+        if query_norm in title_norm:
+            listing_suggestions.append(title)
+            
+    # Dedup and limit
+    seen = set()
+    suggestions = []
+    
+    for sug in cat_suggestions:
+        if sug not in seen:
+            seen.add(sug)
+            suggestions.append(sug)
+            
+    for sug in listing_suggestions:
+        if sug not in seen:
+            seen.add(sug)
+            suggestions.append(sug)
+            
+    return suggestions[:10]
 
 @router.get("/me/deleted", response_model=list[ListingRead])
 def get_deleted_listings(
@@ -93,8 +126,21 @@ def list_listings_endpoint(
     condition: ItemCondition | None = Query(default=None),
     status_filter: ListingStatus | None = Query(default=None, alias="status"),
     owner_id: UUID | None = Query(default=None),
+    lat: float | None = Query(default=None),
+    lng: float | None = Query(default=None),
+    radius_km: float | None = Query(default=None),
 ) -> Any:
-    return list_listings(session, search, category_id, condition, status_filter, owner_id)
+    return list_listings(
+        session,
+        search,
+        category_id,
+        condition,
+        status_filter,
+        owner_id,
+        lat=lat,
+        lng=lng,
+        radius_km=radius_km,
+    )
 
 
 @router.post("", response_model=ListingRead, status_code=status.HTTP_201_CREATED)

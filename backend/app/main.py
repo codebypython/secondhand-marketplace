@@ -52,11 +52,20 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
     async def client_tracker_middleware(request: Request, call_next):
         path = request.url.path
         # Allow bypass for dashboard resources to prevent locking administration out
-        if path in ["/", "/dashboard/stats", "/dashboard/block", "/dashboard/unblock"] or path.startswith("/static"):
+        if path in ["/", "/dashboard/stats", "/dashboard/block", "/dashboard/unblock", "/dashboard/activities", "/dashboard/errors"] or path.startswith("/static"):
             return await call_next(request)
             
         client_ip = request.client.host if request.client else "unknown"
         if client_ip in blocked_ips:
+            from app.core.tracker import log_system_error
+            log_system_error(
+                ip=client_ip,
+                method=request.method,
+                path=request.url.path,
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Blocked client attempted access",
+                source="IP Blocker"
+            )
             return JSONResponse(
                 status_code=status.HTTP_403_FORBIDDEN,
                 content={"detail": f"IP {client_ip} has been blocked by the Administrator."}
@@ -64,7 +73,83 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
             
         # Track active request
         track_request(request)
-        return await call_next(request)
+        try:
+            response = await call_next(request)
+            # Log any warning/error status codes returned normally (e.g. 404, 401)
+            if response.status_code >= 400:
+                from app.core.tracker import log_system_error
+                log_system_error(
+                    ip=client_ip,
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=response.status_code,
+                    detail=f"HTTP Response Status {response.status_code}",
+                    source="API Response"
+                )
+            return response
+        except Exception as exc:
+            raise exc
+
+    # Exception Handlers
+    from fastapi.exceptions import RequestValidationError
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+    from app.core.tracker import log_system_error
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        client_ip = request.client.host if request.client else "unknown"
+        errors_detail = exc.errors()
+        log_system_error(
+            ip=client_ip,
+            method=request.method,
+            path=request.url.path,
+            status_code=422,
+            detail=str(errors_detail),
+            source="FastAPI Validator"
+        )
+        return JSONResponse(
+            status_code=422,
+            content={"detail": errors_detail}
+        )
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+        client_ip = request.client.host if request.client else "unknown"
+        log_system_error(
+            ip=client_ip,
+            method=request.method,
+            path=request.url.path,
+            status_code=exc.status_code,
+            detail=str(exc.detail),
+            source="FastAPI HTTP"
+        )
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"detail": exc.detail}
+        )
+
+    @app.exception_handler(Exception)
+    async def generic_exception_handler(request: Request, exc: Exception):
+        import traceback
+        client_ip = request.client.host if request.client else "unknown"
+        error_msg = f"{type(exc).__name__}: {str(exc)}"
+        tb = traceback.format_exc()
+        print("=" * 60)
+        print(f"[INTERNAL ERROR] {error_msg}\n{tb}")
+        print("=" * 60)
+        
+        log_system_error(
+            ip=client_ip,
+            method=request.method,
+            path=request.url.path,
+            status_code=500,
+            detail=f"{error_msg}\n{tb}",
+            source="Server Internal"
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal Server Error"}
+        )
 
     def get_session_override():
         with session_factory() as session:
@@ -90,6 +175,7 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
             --primary: #6366f1;
             --primary-hover: #4f46e5;
             --success: #10b981;
+            --warning: #fbbf24;
             --danger: #ef4444;
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
@@ -111,7 +197,7 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -165,7 +251,7 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
             gap: 2rem;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 1024px) {
             .grid { grid-template-columns: 1fr; }
         }
 
@@ -176,6 +262,10 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
             border-radius: 16px;
             padding: 1.5rem;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            margin-bottom: 2rem;
+        }
+        .card:last-child {
+            margin-bottom: 0;
         }
 
         .card-title {
@@ -289,6 +379,23 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
             font-size: 0.75rem;
             font-weight: 600;
         }
+
+        .badge-warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .badge-danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fb7185;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
         
         .client-ua {
             max-width: 180px;
@@ -297,6 +404,22 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
             text-overflow: ellipsis;
             color: var(--text-muted);
             font-size: 0.8rem;
+        }
+
+        .error-detail-cell {
+            max-width: 250px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: monospace;
+            font-size: 0.8rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: color 0.2s;
+        }
+        .error-detail-cell:hover {
+            color: var(--primary);
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -314,6 +437,7 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
         </header>
 
         <div class="grid">
+            <!-- Left Column: Server Status & Instructions -->
             <div style="display: flex; flex-direction: column; gap: 2rem;">
                 <div class="card">
                     <h2 class="card-title">Trạng Thái Server</h2>
@@ -365,32 +489,94 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
                 </div>
             </div>
 
-            <div class="card">
-                <h2 class="card-title">Quản Lý Client Đang Kết Nối</h2>
-                <div style="overflow-x: auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>IP Address</th>
-                                <th>Thiết bị</th>
-                                <th>Số requests</th>
-                                <th>API gần nhất</th>
-                                <th>Hoạt động</th>
-                                <th>Hành động</th>
-                            </tr>
-                        </thead>
-                        <tbody id="clientTableBody">
-                            <tr>
-                                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Đang tải danh sách kết nối...</td>
-                            </tr>
-                        </tbody>
-                    </table>
+            <!-- Right Column: Connected Clients, Activities, Error Diagnostics -->
+            <div style="display: flex; flex-direction: column; gap: 2rem;">
+                <div class="card">
+                    <h2 class="card-title">Quản Lý Client Đang Kết Nối</h2>
+                    <div style="overflow-x: auto; max-height: 250px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>IP Address</th>
+                                    <th>Thiết bị</th>
+                                    <th>Số requests</th>
+                                    <th>API gần nhất</th>
+                                    <th>Hoạt động</th>
+                                    <th>Hành động</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientTableBody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Đang tải danh sách kết nối...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="card-title" style="border-left-color: var(--primary);">Nhật Ký Hoạt Động Hệ Thống</h2>
+                    <div style="overflow-x: auto; max-height: 300px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Thời gian</th>
+                                    <th>Tài khoản</th>
+                                    <th>Hành động</th>
+                                    <th>Đối tượng</th>
+                                    <th>Chi tiết</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activityTableBody">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Đang tải danh sách hoạt động...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h2 class="card-title" style="border-left-color: var(--danger);">Nhật Ký Lỗi & Sự Cố Hệ Thống (Diagnostics)</h2>
+                    <div style="overflow-x: auto; max-height: 300px;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Thời gian</th>
+                                    <th>IP Client</th>
+                                    <th>API / Endpoint</th>
+                                    <th>Phân loại</th>
+                                    <th>Mã</th>
+                                    <th>Chi tiết lỗi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="errorTableBody">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Đang tải nhật ký lỗi...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Modal for showing full details -->
+    <div id="detailModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); z-index: 1000; justify-content: center; align-items: center; padding: 2rem;">
+        <div class="card" style="width: 100%; max-width: 700px; margin-bottom: 0;">
+            <h2 class="card-title" id="modalTitle">Chi tiết Lỗi</h2>
+            <pre id="modalContent" style="white-space: pre-wrap; word-break: break-all; background: rgba(0,0,0,0.4); padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; max-height: 400px; overflow-y: auto; color: #fca5a5; border: 1px solid var(--border);"></pre>
+            <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+                <button class="btn" style="background: var(--primary);" onclick="closeModal()">Đóng</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let globalActivities = [];
+        let globalErrors = [];
+
         function formatUptime(seconds) {
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
@@ -410,6 +596,30 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
                 updateStats();
             } catch (err) {
                 console.error("Failed to toggle block status:", err);
+            }
+        }
+
+        function showDetail(title, content) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalContent').textContent = content;
+            document.getElementById('detailModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+
+        function showActivityDetail(index) {
+            const act = globalActivities[index];
+            if (act) {
+                showDetail(`Chi tiết hoạt động (${act.verb})`, JSON.stringify(act.details, null, 2));
+            }
+        }
+
+        function showErrorDetail(index) {
+            const err = globalErrors[index];
+            if (err) {
+                showDetail(`Chi tiết lỗi / Diagnostics (${err.status_code})`, `Thời gian: ${err.timestamp}\nIP: ${err.ip}\nAPI: ${err.method} ${err.path}\nNguồn: ${err.source}\nMã lỗi: ${err.status_code}\n\nChi tiết lỗi:\n${err.detail}`);
             }
         }
 
@@ -443,42 +653,103 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
                 const tbody = document.getElementById('clientTableBody');
                 if (data.active_clients.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 2rem;">Chưa có client nào kết nối tới API.</td></tr>`;
-                    return;
+                } else {
+                    let html = '';
+                    data.active_clients.forEach(client => {
+                        const statusBadge = client.is_blocked 
+                            ? `<span class="badge-blocked">ĐÃ CHẶN</span>` 
+                            : `<span class="badge-active">HOẠT ĐỘNG</span>`;
+                        
+                        const btnClass = client.is_blocked ? 'btn-unblock' : '';
+                        const btnText = client.is_blocked ? 'Bỏ Chặn IP' : 'Chặn IP';
+
+                        html += `
+                            <tr>
+                                <td style="font-weight: 600; color: #818cf8;">${client.ip}</td>
+                                <td>
+                                    <div style="font-weight: 600;">${client.browser}</div>
+                                    <div class="client-ua" title="${client.user_agent}">${client.user_agent}</div>
+                                </td>
+                                <td style="text-align: center; font-weight: 600;">${client.request_count}</td>
+                                <td style="font-family: monospace; color: #a78bfa;">${client.last_path}</td>
+                                <td>
+                                    <div>${client.last_seen_seconds_ago}s trước</div>
+                                    <div style="margin-top: 0.25rem;">${statusBadge}</div>
+                                </td>
+                                <td>
+                                    <button class="btn ${btnClass}" onclick="toggleBlock('${client.ip}', ${client.is_blocked})">
+                                        ${btnText}
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
                 }
-
-                let html = '';
-                data.active_clients.forEach(client => {
-                    const statusBadge = client.is_blocked 
-                        ? `<span class="badge-blocked">ĐÃ CHẶN</span>` 
-                        : `<span class="badge-active">HOẠT ĐỘNG</span>`;
-                    
-                    const btnClass = client.is_blocked ? 'btn-unblock' : '';
-                    const btnText = client.is_blocked ? 'Bỏ Chặn IP' : 'Chặn IP';
-
-                    html += `
-                        <tr>
-                            <td style="font-weight: 600; color: #818cf8;">${client.ip}</td>
-                            <td>
-                                <div style="font-weight: 600;">${client.browser}</div>
-                                <div class="client-ua" title="${client.user_agent}">${client.user_agent}</div>
-                            </td>
-                            <td style="text-align: center; font-weight: 600;">${client.request_count}</td>
-                            <td style="font-family: monospace; color: #a78bfa;">${client.last_path}</td>
-                            <td>
-                                <div>${client.last_seen_seconds_ago}s trước</div>
-                                <div style="margin-top: 0.25rem;">${statusBadge}</div>
-                            </td>
-                            <td>
-                                <button class="btn ${btnClass}" onclick="toggleBlock('${client.ip}', ${client.is_blocked})">
-                                    ${btnText}
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                });
-                tbody.innerHTML = html;
             } catch (err) {
                 console.error("Failed to fetch dashboard statistics:", err);
+            }
+
+            // Fetch Activities
+            try {
+                const res = await fetch('/dashboard/activities');
+                const data = await res.json();
+                globalActivities = data;
+
+                const tbody = document.getElementById('activityTableBody');
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Chưa có hoạt động nào được ghi nhận.</td></tr>`;
+                } else {
+                    let html = '';
+                    data.forEach((act, idx) => {
+                        const dt = new Date(act.created_at).toLocaleTimeString('vi-VN');
+                        const detailsStr = JSON.stringify(act.details);
+                        html += `
+                            <tr>
+                                <td style="color: var(--text-muted); font-size: 0.8rem;">${dt}</td>
+                                <td style="font-weight: 600; color: #c084fc;">${act.actor_email}</td>
+                                <td style="font-weight: 600; color: #818cf8;">${act.verb}</td>
+                                <td style="color: var(--text-muted);">${act.target_type || '-'}</td>
+                                <td class="error-detail-cell" onclick="showActivityDetail(${idx})" title="Click để xem chi tiết">${detailsStr}</td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
+                }
+            } catch (err) {
+                console.error("Failed to fetch activities:", err);
+            }
+
+            // Fetch Error Diagnostics
+            try {
+                const res = await fetch('/dashboard/errors');
+                const data = await res.json();
+                globalErrors = data;
+
+                const tbody = document.getElementById('errorTableBody');
+                if (data.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">Không có lỗi hệ thống nào được ghi nhận.</td></tr>`;
+                } else {
+                    let html = '';
+                    data.forEach((err, idx) => {
+                        const dt = new Date(err.timestamp).toLocaleTimeString('vi-VN');
+                        const isSystem = err.status_code >= 500 || err.source === "Server Internal";
+                        const badgeClass = isSystem ? 'badge-danger' : 'badge-warning';
+                        html += `
+                            <tr>
+                                <td style="color: var(--text-muted); font-size: 0.8rem;">${dt}</td>
+                                <td style="font-weight: 600; color: #fb7185;">${err.ip}</td>
+                                <td style="font-family: monospace; color: #a78bfa;">${err.method} ${err.path}</td>
+                                <td><span class="${badgeClass}">${err.source}</span></td>
+                                <td style="font-weight: 700; color: ${isSystem ? 'var(--danger)' : 'var(--warning)'};">${err.status_code}</td>
+                                <td class="error-detail-cell" onclick="showErrorDetail(${idx})" title="Click để xem chi tiết">${err.detail}</td>
+                            </tr>
+                        `;
+                    });
+                    tbody.innerHTML = html;
+                }
+            } catch (err) {
+                console.error("Failed to fetch error diagnostics:", err);
             }
         }
 
@@ -542,6 +813,29 @@ def create_app(session_factory=SessionFactory) -> FastAPI:
             blocked_ips.discard(ip)
             return {"status": "success", "message": f"IP {ip} unblocked"}
         return {"status": "error", "message": "IP not provided"}
+
+    @app.get("/dashboard/activities")
+    def get_activities():
+        with session_factory() as session:
+            from app.services.audit import list_activity_logs
+            logs = list_activity_logs(session, limit=50)
+            return [
+                {
+                    "id": str(log.id),
+                    "created_at": log.created_at.isoformat(),
+                    "actor_email": log.actor.email if log.actor else "Anonymous",
+                    "verb": log.verb,
+                    "target_type": log.target_type,
+                    "target_id": log.target_id,
+                    "details": log.details
+                }
+                for log in logs
+            ]
+
+    @app.get("/dashboard/errors")
+    def get_errors():
+        from app.core.tracker import error_logs
+        return error_logs
 
     return app
 

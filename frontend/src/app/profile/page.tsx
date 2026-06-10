@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Crown, User, CheckCircle, AlertTriangle, TrendingUp, Trash2, Edit } from "lucide-react";
+import { Crown, User, CheckCircle, AlertTriangle, TrendingUp, Trash2, Edit, Upload } from "lucide-react";
 
 import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
@@ -10,6 +10,7 @@ import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Listing, Wishlist } from "@/lib/types";
 import { conditionLabels, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
+import { ImageCropperModal } from "@/components/ui/image-cropper-modal";
 
 export default function ProfilePage() {
   const { token, user, refreshUser } = useAuth();
@@ -23,6 +24,48 @@ export default function ProfilePage() {
   const [dob, setDob] = useState(() => user?.profile?.dob ?? "");
   const [shopSlug, setShopSlug] = useState(() => user?.profile?.shop_slug ?? "");
   const [loading, setLoading] = useState(false);
+
+  // Image cropping states
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState("");
+  const [cropperMode, setCropperMode] = useState<"avatar" | "banner">("avatar");
+  const [croppingUpload, setCroppingUpload] = useState(false);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, mode: "avatar" | "banner") => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropperImageSrc(reader.result as string);
+        setCropperMode(mode);
+        setCropperOpen(true);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleCropComplete = async (blob: Blob) => {
+    if (!token) return;
+    setCroppingUpload(true);
+    try {
+      const file = new File(
+        [blob],
+        cropperMode === "avatar" ? "avatar_cropped.jpg" : "banner_cropped.jpg",
+        { type: "image/jpeg" }
+      );
+      const res = await api.uploadMedia(token, file);
+      if (cropperMode === "avatar") {
+        setAvatarUrl(res.url);
+      } else {
+        setBannerUrl(res.url);
+      }
+      showToast("Tải và cắt ảnh thành công! Đừng quên nhấn 'Lưu thay đổi' phía dưới.", "success");
+    } catch (err) {
+      showToast("Lỗi khi tải ảnh lên hệ thống.", "danger");
+    } finally {
+      setCroppingUpload(false);
+    }
+  };
   const [myListings, setMyListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
 
@@ -240,12 +283,49 @@ export default function ProfilePage() {
               <input id="address" placeholder="123 Đường ABC, Quận X..." value={address} onChange={(e) => setAddress(e.target.value)} />
             </div>
             <div className="field">
-              <label htmlFor="avatarUrl">Avatar URL</label>
-              <input id="avatarUrl" placeholder="https://example.com/avatar.jpg" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} />
+              <label>Ảnh đại diện (Avatar)</label>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                {avatarUrl && (
+                  <img
+                    src={avatarUrl}
+                    alt="Avatar Preview"
+                    style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover", border: "1px solid var(--border)" }}
+                  />
+                )}
+                <label className="button secondary sm" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Upload size={14} />
+                  Chọn và cắt ảnh
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "avatar")}
+                    style={{ display: "none" }}
+                  />
+                </label>
+              </div>
             </div>
+            
             <div className="field">
-              <label htmlFor="bannerUrl">Banner Shop URL</label>
-              <input id="bannerUrl" placeholder="https://example.com/banner.jpg" value={bannerUrl} onChange={(e) => setBannerUrl(e.target.value)} />
+              <label>Ảnh bìa Shop (Banner)</label>
+              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                {bannerUrl && (
+                  <img
+                    src={bannerUrl}
+                    alt="Banner Preview"
+                    style={{ width: 80, height: 40, borderRadius: "var(--radius-sm)", objectFit: "cover", border: "1px solid var(--border)" }}
+                  />
+                )}
+                <label className="button secondary sm" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  <Upload size={14} />
+                  Chọn và cắt ảnh
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, "banner")}
+                    style={{ display: "none" }}
+                  />
+                </label>
+              </div>
             </div>
             <div className="field">
               <label htmlFor="bio">Giới thiệu bản thân</label>
@@ -390,6 +470,14 @@ export default function ProfilePage() {
           )}
         </div>
       </div>
+
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={cropperImageSrc}
+        mode={cropperMode}
+        onClose={() => setCropperOpen(false)}
+        onCrop={handleCropComplete}
+      />
     </PageShell>
   );
 }

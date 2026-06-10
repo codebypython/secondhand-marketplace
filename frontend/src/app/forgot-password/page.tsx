@@ -56,19 +56,8 @@ function ForgotPasswordForm() {
         ) : (
           <form onSubmit={handleSubmit}>
             {initialEmail && (
-              <div 
-                className="alert alert-info" 
-                style={{ 
-                  marginBottom: 16, 
-                  fontSize: 13, 
-                  backgroundColor: "rgba(99, 102, 241, 0.08)", 
-                  color: "var(--primary)", 
-                  border: "1px solid rgba(99, 102, 241, 0.15)",
-                  padding: "10px 12px",
-                  borderRadius: "var(--radius)"
-                }}
-              >
-                💡 Đang thực hiện khôi phục mật khẩu cho tài khoản đã nhập: <strong>{initialEmail}</strong>
+              <div className="alert alert-info" style={{ marginBottom: 16 }}>
+                Đang thực hiện khôi phục mật khẩu cho tài khoản đã nhập: <strong>{initialEmail}</strong>
               </div>
             )}
             <div className="field">

@@ -34,6 +34,7 @@ class ListingCreate(BaseModel):
     has_warranty: bool = False
     location_data: dict | None = None
     image_urls: list[str] = Field(default_factory=list)
+    video_url: str | None = Field(default=None, max_length=1024)
 
 
 class ListingUpdate(BaseModel):
@@ -46,6 +47,7 @@ class ListingUpdate(BaseModel):
     has_warranty: bool | None = None
     location_data: dict | None = None
     image_urls: list[str] | None = None
+    video_url: str | None = Field(default=None, max_length=1024)
     status: ListingStatus | None = None
 
 
@@ -61,6 +63,7 @@ class ListingRead(ORMModel):
     has_warranty: bool = False
     location_data: dict | None = None
     image_urls: list[str]
+    video_url: str | None = None
     status: ListingStatus
     created_at: datetime
     updated_at: datetime | None = None

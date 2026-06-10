@@ -3,8 +3,10 @@
 )
 
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Set-Location $PSScriptRoot
 $env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "🔄 DỌN DẸP & RESET DATABASE (LOCAL DATABASE)" -ForegroundColor Cyan

@@ -21,6 +21,8 @@ export interface Profile {
   banner_url?: string | null;
   shop_slug?: string | null;
   bio?: string | null;
+  lat?: number | null;
+  lng?: number | null;
 }
 
 export interface User {
@@ -113,6 +115,7 @@ export interface Message {
   content: string;
   created_at: string;
   sender?: User | null;
+  status?: string;
 }
 
 export interface Conversation {

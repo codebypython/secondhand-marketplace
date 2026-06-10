@@ -97,34 +97,12 @@ function ResetPasswordForm() {
         ) : (
           <form onSubmit={handleSubmit}>
             {tokenInvalid ? (
-              <div 
-                className="alert alert-danger" 
-                style={{ 
-                  marginBottom: 16, 
-                  backgroundColor: "rgba(239, 68, 68, 0.08)", 
-                  color: "#fca5a5", 
-                  border: "1px solid rgba(239, 68, 68, 0.15)",
-                  padding: "12px",
-                  borderRadius: "var(--radius)",
-                  fontSize: 13
-                }}
-              >
-                ⚠️ {error || "Liên kết này không hợp lệ hoặc đã hết hạn. Vui lòng gửi lại yêu cầu quên mật khẩu."}
+              <div className="alert alert-danger" style={{ marginBottom: 16 }}>
+                {error || "Liên kết này không hợp lệ hoặc đã hết hạn. Vui lòng gửi lại yêu cầu quên mật khẩu."}
               </div>
             ) : verifiedEmail ? (
-              <div 
-                className="alert alert-info" 
-                style={{ 
-                  marginBottom: 16, 
-                  fontSize: 13, 
-                  backgroundColor: "rgba(99, 102, 241, 0.08)", 
-                  color: "var(--primary)", 
-                  border: "1px solid rgba(99, 102, 241, 0.15)",
-                  padding: "10px 12px",
-                  borderRadius: "var(--radius)"
-                }}
-              >
-                💡 Khôi phục mật khẩu cho tài khoản: <strong>{verifiedEmail}</strong>
+              <div className="alert alert-info" style={{ marginBottom: 16 }}>
+                Khôi phục mật khẩu cho tài khoản: <strong>{verifiedEmail}</strong>
               </div>
             ) : null}
 

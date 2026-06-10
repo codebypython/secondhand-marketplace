@@ -7,8 +7,9 @@ import { useAuth } from "@/components/auth-provider";
 import { PageShell } from "@/components/page-shell";
 import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
-import type { Conversation } from "@/lib/types";
-import { getInitials, timeAgo } from "@/lib/utils";
+import type { Conversation, Message } from "@/lib/types";
+import Link from "next/link";
+import { getInitials, timeAgo, formatPrice } from "@/lib/utils";
 
 export default function InboxPage() {
   const { token, user } = useAuth();
@@ -39,6 +40,31 @@ export default function InboxPage() {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [showCameraWarning, setShowCameraWarning] = useState(false);
+
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [listingDetail, setListingDetail] = useState<any>(null);
+  const [loadingListing, setLoadingListing] = useState(false);
+
+  const selected = conversations.find((c) => c.id === selectedId) ?? null;
+
+  useEffect(() => {
+    if (!selected?.listing_id) {
+      setListingDetail(null);
+      return;
+    }
+    setLoadingListing(true);
+    api.getListing(selected.listing_id)
+      .then((detail) => {
+        setListingDetail(detail);
+      })
+      .catch((err) => {
+        console.error("Failed to load listing detail for sidebar:", err);
+      })
+      .finally(() => {
+        setLoadingListing(false);
+      });
+  }, [selected?.listing_id]);
 
   const reload = async () => {
     if (!token) return;
@@ -108,10 +134,36 @@ export default function InboxPage() {
           setConversations((prev) =>
             prev.map((c) => {
               if (c.id === newMsg.conversation_id) {
-                const exists = c.messages.some((m) => m.id === newMsg.id);
+                // Filter out the temp optimistic message for this content
+                const filtered = c.messages.filter(m => !(m.id.startsWith("temp-") && m.content === newMsg.content));
+                const exists = filtered.some((m) => m.id === newMsg.id);
                 return {
                   ...c,
-                  messages: exists ? c.messages : [...c.messages, newMsg],
+                  messages: exists 
+                    ? filtered.map(m => m.id === newMsg.id ? newMsg : m)
+                    : [...filtered, newMsg],
+                };
+              }
+              return c;
+            })
+          );
+          
+          // Auto-mark as read if we are looking at this conversation
+          if (selectedId === newMsg.conversation_id && newMsg.sender_id !== user?.id) {
+            ws.send(JSON.stringify({
+              type: "read_conversation",
+              conversation_id: selectedId
+            }));
+          }
+        } else if (data.type === "messages_read") {
+          setConversations((prev) =>
+            prev.map((c) => {
+              if (c.id === data.conversation_id) {
+                return {
+                  ...c,
+                  messages: c.messages.map((m) => 
+                    m.sender_id !== data.reader_id ? { ...m, status: "read" } : m
+                  )
                 };
               }
               return c;
@@ -160,8 +212,23 @@ export default function InboxPage() {
     };
   }, [token]);
 
+  // Send read receipt when selecting conversation, or when a new message arrives
+  useEffect(() => {
+    if (!selectedId || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+    wsRef.current.send(JSON.stringify({
+      type: "read_conversation",
+      conversation_id: selectedId
+    }));
+  }, [selectedId, selected?.messages.length]);
+
   const startCall = async () => {
     if (!selected || !wsRef.current) return;
+
+    if (typeof window !== "undefined" && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
+      setShowCameraWarning(true);
+      return;
+    }
+
     const otherParticipant = selected.participants.find((p) => p.id !== user?.id);
     if (!otherParticipant) return;
 
@@ -210,6 +277,12 @@ export default function InboxPage() {
   const acceptCall = async () => {
     if (!callerId || !callSDP || !wsRef.current) return;
     setIsIncomingCall(false);
+
+    if (typeof window !== "undefined" && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
+      setShowCameraWarning(true);
+      rejectCall();
+      return;
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
@@ -293,7 +366,6 @@ export default function InboxPage() {
     );
   }
 
-  const selected = conversations.find((c) => c.id === selectedId) ?? null;
   const filteredConversations = searchConv
     ? conversations.filter((c) => {
         const title = c.title?.toLowerCase() ?? "";
@@ -303,8 +375,34 @@ export default function InboxPage() {
     : conversations;
 
   const handleSend = async () => {
-    if (!selected || !messageText.trim()) return;
+    if (!selected || !messageText.trim() || !user?.id) return;
     setSending(true);
+    
+    // Create optimistic message
+    const tempId = "temp-" + Date.now();
+    const optimisticMsg: Message = {
+      id: tempId,
+      conversation_id: selected.id,
+      sender_id: user.id,
+      content: messageText,
+      status: "sending",
+      created_at: new Date().toISOString(),
+      sender: user as any
+    };
+    
+    // Optimistically add to message list
+    setConversations((prev) =>
+      prev.map((c) => {
+        if (c.id === selected.id) {
+          return {
+            ...c,
+            messages: [...c.messages, optimisticMsg]
+          };
+        }
+        return c;
+      })
+    );
+    
     try {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
@@ -314,12 +412,34 @@ export default function InboxPage() {
         }));
         setMessageText("");
       } else {
-        await api.sendMessage(token, { conversation_id: selected.id, content: messageText });
+        const res = await api.sendMessage(token, { conversation_id: selected.id, content: messageText }) as any;
         setMessageText("");
-        const updated = await api.getConversation(token, selected.id);
-        setConversations((prev) => prev.map((c) => c.id === updated.id ? updated : c));
+        // Replace temp message with server message
+        setConversations((prev) =>
+          prev.map((c) => {
+            if (c.id === selected.id) {
+              return {
+                ...c,
+                messages: c.messages.map(m => m.id === tempId ? res : m)
+              };
+            }
+            return c;
+          })
+        );
       }
     } catch (err) {
+      // Remove temp message on error
+      setConversations((prev) =>
+        prev.map((c) => {
+          if (c.id === selected.id) {
+            return {
+              ...c,
+              messages: c.messages.filter(m => m.id !== tempId)
+            };
+          }
+          return c;
+        })
+      );
       showToast(err instanceof Error ? err.message : "Không thể gửi tin nhắn.", "danger");
     } finally {
       setSending(false);
@@ -393,7 +513,7 @@ export default function InboxPage() {
 
   return (
     <PageShell title="Hộp thư" description="Nhắn tin với người mua và người bán">
-      <div className="grid two" style={{ gridTemplateColumns: "340px 1fr", minHeight: 560 }}>
+      <div className="grid two" style={{ gridTemplateColumns: showSidebar ? "340px 1fr 300px" : "340px 1fr", minHeight: 560, transition: "grid-template-columns 250ms ease" }}>
         {/* Left: Conversation list */}
         <div className="inbox-section" style={{ display: "flex", flexDirection: "column", gap: 0, padding: 0, overflow: "hidden" }}>
           <div className="inbox-section-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
@@ -503,17 +623,28 @@ export default function InboxPage() {
                     </div>
                   </div>
                 </div>
-                {selected.participants.some((p) => p.id !== user?.id) && (
-                  <button 
-                    className="button secondary sm" 
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {selected.participants.some((p) => p.id !== user?.id) && (
+                    <button 
+                      className="button secondary sm" 
+                      type="button"
+                      onClick={startCall} 
+                      style={{ display: "flex", alignItems: "center", gap: 6 }}
+                      title="Gọi video WebRTC"
+                    >
+                      <Video size={16} /> Gọi Video
+                    </button>
+                  )}
+                  <button
+                    className={`button ${showSidebar ? "primary" : "secondary"} sm`}
                     type="button"
-                    onClick={startCall} 
-                    style={{ display: "flex", alignItems: "center", gap: 6 }}
-                    title="Gọi video WebRTC"
+                    onClick={() => setShowSidebar(!showSidebar)}
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 36, height: 36, padding: 0 }}
+                    title="Thông tin cuộc hội thoại"
                   >
-                    <Video size={16} /> Gọi Video
+                    ❗
                   </button>
-                )}
+                </div>
               </div>
 
               {/* Messages */}
@@ -591,8 +722,16 @@ export default function InboxPage() {
                                   )}
                                 </div>
                               </div>
-                              <div className="message-meta" style={{ textAlign: isSent ? "right" : "left", paddingLeft: 4, paddingRight: 4 }}>
-                                {new Date(msg.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}
+                              <div className="message-meta" style={{ display: "flex", alignItems: "center", justifyContent: isSent ? "flex-end" : "flex-start", gap: 4, paddingLeft: 4, paddingRight: 4 }}>
+                                <span>{new Date(msg.created_at).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" })}</span>
+                                {isSent && (
+                                  <>
+                                    {msg.status === "sending" && <span style={{ fontSize: 9, color: "var(--text-tertiary)" }} title="Đang gửi">⏳</span>}
+                                    {msg.status === "sent" && <span style={{ color: "var(--text-tertiary)", fontSize: 10, fontWeight: "bold" }} title="Đã gửi">✓</span>}
+                                    {msg.status === "delivered" && <span style={{ color: "var(--text-secondary)", fontSize: 10, fontWeight: "bold" }} title="Đã nhận">✓✓</span>}
+                                    {msg.status === "read" && <span style={{ color: "var(--accent)", fontSize: 10, fontWeight: "bold" }} title="Đã xem">✓✓</span>}
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -650,6 +789,119 @@ export default function InboxPage() {
             </div>
           )}
         </div>
+
+        {/* Sidebar container */}
+        {showSidebar && selected && (
+          <div
+            className="panel"
+            style={{
+              borderLeft: "1px solid var(--border)",
+              backgroundColor: "var(--bg-card)",
+              padding: 20,
+              display: "flex",
+              flexDirection: "column",
+              gap: 20,
+              overflowY: "auto",
+              width: 300,
+              flexShrink: 0
+            }}
+          >
+            {/* Header */}
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
+              Thông tin hội thoại
+            </h3>
+            
+            {/* Partner Details */}
+            {(() => {
+              const partner = selected.participants.find((p) => p.id !== user?.id);
+              if (!partner) return <p className="muted">Không có thông tin đối tác.</p>;
+              const partnerName = partner.profile?.display_name || partner.profile?.full_name || partner.email;
+              const initials = getInitials(partner.profile?.full_name, partner.email?.[0]?.toUpperCase());
+              
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}>
+                    <div style={{
+                      width: 64, height: 64, borderRadius: "50%",
+                      backgroundColor: "var(--accent)", color: "var(--text-inverse)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 22, fontWeight: 700, overflow: "hidden"
+                    }}>
+                      {partner.profile?.avatar_url ? (
+                        <img src={partner.profile.avatar_url} alt="Partner avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                      ) : initials}
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>{partnerName}</h4>
+                      {partner.profile?.shop_slug && (
+                        <span className="muted" style={{ fontSize: 12 }}>@{partner.profile.shop_slug}</span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div><strong>Giới thiệu:</strong> <p className="muted" style={{ marginTop: 4, lineHeight: 1.4 }}>{partner.profile?.bio || "Không có giới thiệu."}</p></div>
+                    <div><strong>Tham gia:</strong> <span className="muted">{new Date(partner.created_at).toLocaleDateString("vi-VN")}</span></div>
+                  </div>
+                  
+                  <Link
+                    className="button primary sm"
+                    href={`/users/${partner.id}`}
+                    style={{ textAlign: "center", width: "100%", display: "block", fontSize: 12 }}
+                  >
+                    🏪 Ghé xem Shop
+                  </Link>
+                </div>
+              );
+            })()}
+            
+            <div className="divider" style={{ height: 1, backgroundColor: "var(--border)", margin: "4px 0" }} />
+            
+            {/* Statistics */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Thống kê tương tác</h4>
+              <div style={{ fontSize: 13, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div className="split">
+                  <span className="muted">Bắt đầu:</span>
+                  <span>{new Date(selected.created_at).toLocaleDateString("vi-VN")}</span>
+                </div>
+                <div className="split">
+                  <span className="muted">Tổng số tin:</span>
+                  <span className="badge">{selected.messages.length}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Listing Details */}
+            {selected.listing_id && (
+              <>
+                <div className="divider" style={{ height: 1, backgroundColor: "var(--border)", margin: "4px 0" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Sản phẩm quan tâm</h4>
+                  {loadingListing ? (
+                    <div className="skeleton" style={{ height: 80 }} />
+                  ) : listingDetail ? (
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                      {listingDetail.image_urls?.[0] && (
+                        <img src={listingDetail.image_urls[0]} alt={listingDetail.title} style={{ width: 50, height: 50, borderRadius: 8, objectFit: "cover" }} />
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <Link href={`/listings/${listingDetail.id}`} style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", textDecoration: "none", display: "block" }} className="truncate">
+                          {listingDetail.title}
+                        </Link>
+                        <span style={{ fontSize: 12, color: "var(--accent)", fontWeight: 500 }}>
+                          {formatPrice(listingDetail.price)} ₫
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="muted" style={{ fontSize: 12 }}>Sản phẩm không hoạt động.</p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* WebRTC Video Call Overlay Modal */}
@@ -736,6 +988,46 @@ export default function InboxPage() {
             <button className="button primary sm" onClick={acceptCall} style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <Phone size={14} /> Trả lời
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Camera warning modal for insecure context */}
+      {showCameraWarning && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.9)", backdropFilter: "blur(8px)",
+          zIndex: 10001, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", color: "white", padding: 20
+        }}>
+          <div className="card" style={{ width: "100%", maxWidth: 550, border: "1px solid var(--warning)", background: "var(--bg-card)", margin: 0 }}>
+            <h2 className="card-title" style={{ borderLeftColor: "var(--warning)", color: "var(--warning)" }}>
+              ⚠️ Thiết Bị Không Hỗ Trợ Camera (HTTP LAN)
+            </h2>
+            <div style={{ padding: "10px 0", display: "flex", flexDirection: "column", gap: 14, fontSize: 14, color: "var(--text)" }}>
+              <p>Trình duyệt của bạn chặn quyền truy cập Camera/Microphone qua giao thức kết nối HTTP không bảo mật.</p>
+              
+              <div style={{ background: "rgba(251, 191, 36, 0.08)", border: "1px solid rgba(251, 191, 36, 0.2)", padding: 12, borderRadius: 8 }}>
+                <strong style={{ color: "var(--warning)" }}>Cách khắc phục 1 (Khuyên dùng):</strong>
+                <p style={{ marginTop: 4 }}>Sử dụng địa chỉ <strong>localhost</strong> thay vì IP LAN để truy cập:</p>
+                <code style={{ display: "block", background: "rgba(0,0,0,0.2)", padding: "4px 8px", borderRadius: 4, margin: "6px 0", color: "#fbbf24" }}>
+                  http://localhost:3000 (hoặc cổng 3001)
+                </code>
+              </div>
+
+              <div style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid var(--border)", padding: 12, borderRadius: 8 }}>
+                <strong>Cách khắc phục 2 (Cho IP LAN):</strong>
+                <ol style={{ paddingLeft: 16, marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <li>Sao chép đường dẫn: <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code></li>
+                  <li>Dán vào thanh địa chỉ trình duyệt Chrome/Edge của bạn.</li>
+                  <li>Thêm địa chỉ IP LAN hiện tại (ví dụ: <code>http://192.168.1.5:3000</code>) vào ô danh sách.</li>
+                  <li>Chọn <strong>Enabled</strong>, nhấn <strong>Relaunch</strong> trình duyệt để áp dụng.</li>
+                </ol>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <button className="button primary" onClick={() => setShowCameraWarning(false)}>Đóng</button>
+            </div>
           </div>
         </div>
       )}

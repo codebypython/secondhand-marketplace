@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, ForeignKey, String, DateTime
+from sqlalchemy import Date, ForeignKey, String, DateTime, Float
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
@@ -104,5 +104,7 @@ class Profile(Base, UUIDMixin, TimestampMixin):
     privacy_settings: Mapped[dict | None] = mapped_column(JSONBSqlType)
     banner_url: Mapped[str | None] = mapped_column(String(1024))
     shop_slug: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    lng: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="profile")

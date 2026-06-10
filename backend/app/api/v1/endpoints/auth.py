@@ -63,11 +63,11 @@ def send_smtp_email_sync(recipient: str, subject: str, body_html: str, settings)
         server.sendmail(settings.smtp_user, recipient, msg.as_string())
         server.quit()
         print("=" * 60)
-        print(f"📧 [REAL SMTP EMAIL SENT TO {recipient}] successfully!")
+        print(f"[REAL SMTP EMAIL SENT TO {recipient}] successfully!")
         print("=" * 60)
     except Exception as e:
         print("=" * 60)
-        print(f"❌ [SMTP ERROR] Failed to send email to {recipient}: {e}")
+        print(f"[SMTP ERROR] Failed to send email to {recipient}: {e}")
         print("=" * 60)
 
 
@@ -136,8 +136,8 @@ def forgot_password(
     session.commit()
     
     print("=" * 60)
-    print(f"📧 [MOCK EMAIL SENT TO {user.email}]")
-    print(f"🔗 Reset password link: {reset_link}")
+    print(f"[MOCK EMAIL SENT TO {user.email}]")
+    print(f"Reset password link: {reset_link}")
     print("=" * 60)
     
     # Try sending via real SMTP if configured in .env

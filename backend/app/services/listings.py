@@ -10,6 +10,17 @@ from app.services.notification import create_notification
 from app.services.audit import log_activity
 
 
+def normalize_text(text: str | None) -> str:
+    if not text:
+        return ""
+    import unicodedata
+    text = text.lower()
+    nfkd_form = unicodedata.normalize('NFKD', text)
+    without_diacritics = "".join([c for c in nfkd_form if not unicodedata.combining(c)])
+    without_diacritics = without_diacritics.replace('đ', 'd').replace('Đ', 'd')
+    return without_diacritics.strip()
+
+
 def check_category_cycle(session: Session, parent_id: str | None, current_id: str | None = None) -> None:
     """Walk up the parent chain to detect circular references in category hierarchy."""
     if parent_id is None:
@@ -28,6 +39,7 @@ def check_category_cycle(session: Session, parent_id: str | None, current_id: st
 
 def list_categories(session: Session) -> list[Category]:
     return list_categories_for_real(session)
+
 
 def list_categories_for_real(session: Session) -> list[Category]:
     return list(session.scalars(select(Category).order_by(Category.name.asc())))
@@ -110,14 +122,22 @@ def get_listing_or_error(session: Session, listing_id) -> Listing:
     return listing
 
 
-def list_listings(session: Session, search: str | None = None, category_id=None, condition=None, status: ListingStatus | None = None, owner_id=None, include_deleted: bool = False) -> list[Listing]:
+def list_listings(
+    session: Session,
+    search: str | None = None,
+    category_id=None,
+    condition=None,
+    status: ListingStatus | None = None,
+    owner_id=None,
+    include_deleted: bool = False,
+    lat: float | None = None,
+    lng: float | None = None,
+    radius_km: float | None = None,
+) -> list[Listing]:
     stmt = select(Listing).options(
         selectinload(Listing.owner).selectinload(User.profile),
         selectinload(Listing.category),
     )
-    if search:
-        search_term = f"%{search}%"
-        stmt = stmt.where(Listing.title.ilike(search_term) | Listing.description.ilike(search_term))
     if category_id:
         stmt = stmt.where(Listing.category_id == category_id)
     if condition:
@@ -129,7 +149,94 @@ def list_listings(session: Session, search: str | None = None, category_id=None,
     if not include_deleted:
         stmt = stmt.where(Listing.deleted_at.is_(None))
     stmt = stmt.order_by(Listing.created_at.desc())
-    return list(session.scalars(stmt).unique())
+    results = list(session.scalars(stmt).unique())
+
+    if lat is not None and lng is not None and radius_km is not None:
+        import math
+
+        def calculate_haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+            R = 6371.0  # Earth radius in km
+            d_lat = math.radians(lat2 - lat1)
+            d_lng = math.radians(lng2 - lng1)
+            a = (math.sin(d_lat / 2) ** 2 +
+                 math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) *
+                 math.sin(d_lng / 2) ** 2)
+            c = 2 * math.asin(math.sqrt(a))
+            return R * c
+
+        filtered = []
+        for item in results:
+            if not item.location_data:
+                continue
+            item_lat = item.location_data.get("lat")
+            item_lng = item.location_data.get("lng")
+            if item_lat is not None and item_lng is not None:
+                dist = calculate_haversine_distance(lat, lng, float(item_lat), float(item_lng))
+                if dist <= radius_km:
+                    filtered.append(item)
+        results = filtered
+
+    if search:
+        search_norm = normalize_text(search)
+        search_tokens = [t for t in search_norm.split() if t]
+        
+        if search_tokens:
+            scored_results = []
+            for item in results:
+                score = 0.0
+                title_norm = normalize_text(item.title)
+                desc_norm = normalize_text(item.description)
+                cat_norm = normalize_text(item.category.name) if item.category else ""
+                
+                title_words = title_norm.split()
+                desc_words = desc_norm.split()
+                cat_words = cat_norm.split()
+                
+                # Full query matches
+                if search_norm == title_norm:
+                    score += 200.0
+                elif search_norm in title_norm:
+                    score += 100.0
+                
+                if cat_norm and (search_norm == cat_norm or search_norm in cat_norm):
+                    score += 80.0
+                
+                if search_norm in desc_norm:
+                    score += 20.0
+                
+                # Token word-by-word matches
+                for token in search_tokens:
+                    # Title matches
+                    if token in title_words:
+                        score += 15.0
+                    elif token in title_norm:
+                        score += 5.0
+                    
+                    # Category matches
+                    if cat_norm:
+                        if token in cat_words:
+                            score += 10.0
+                        elif token in cat_norm:
+                            score += 3.0
+                        
+                    # Description matches
+                    if token in desc_words:
+                        score += 5.0
+                    elif token in desc_norm:
+                        score += 1.0
+                
+                if score > 0:
+                    scored_results.append((item, score))
+            
+            # Stable sort: Python's sort is stable, and results is already sorted by created_at desc.
+            # So sorting by score desc retains the created_at desc ordering for equal scores.
+            scored_results.sort(key=lambda x: x[1], reverse=True)
+            results = [x[0] for x in scored_results]
+        else:
+            # If search is only whitespace, return original results
+            pass
+
+    return results
 
 
 def update_listing(session: Session, actor: User, listing_id, payload: ListingUpdate) -> Listing:

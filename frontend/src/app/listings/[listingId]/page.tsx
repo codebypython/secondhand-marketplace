@@ -42,6 +42,7 @@ export default function ListingDetailPage() {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [broadcasterId, setBroadcasterId] = useState<string | null>(null);
   const [wsTrigger, setWsTrigger] = useState(0);
+  const [showCameraWarning, setShowCameraWarning] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -55,6 +56,10 @@ export default function ListingDetailPage() {
   }, [isBroadcasting, isWatching, listing, broadcasterId]);
 
   const startBroadcasting = async () => {
+    if (typeof window !== "undefined" && (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia)) {
+      setShowCameraWarning(true);
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       localStreamRef.current = stream;
@@ -883,6 +888,46 @@ export default function ListingDetailPage() {
               <button className="button secondary" onClick={stopWatching} style={{ padding: "10px 20px" }}>
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera warning modal for insecure context */}
+      {showCameraWarning && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.9)", backdropFilter: "blur(8px)",
+          zIndex: 10001, display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", color: "white", padding: 20
+        }}>
+          <div className="card" style={{ width: "100%", maxWidth: 550, border: "1px solid var(--warning)", background: "var(--bg-card)", margin: 0 }}>
+            <h2 className="card-title" style={{ borderLeftColor: "var(--warning)", color: "var(--warning)" }}>
+              ⚠️ Thiết Bị Không Hỗ Trợ Camera (HTTP LAN)
+            </h2>
+            <div style={{ padding: "10px 0", display: "flex", flexDirection: "column", gap: 14, fontSize: 14, color: "var(--text)" }}>
+              <p>Trình duyệt của bạn chặn quyền truy cập Camera/Microphone qua giao thức kết nối HTTP không bảo mật.</p>
+              
+              <div style={{ background: "rgba(251, 191, 36, 0.08)", border: "1px solid rgba(251, 191, 36, 0.2)", padding: 12, borderRadius: 8 }}>
+                <strong style={{ color: "var(--warning)" }}>Cách khắc phục 1 (Khuyên dùng):</strong>
+                <p style={{ marginTop: 4 }}>Sử dụng địa chỉ <strong>localhost</strong> thay vì IP LAN để truy cập:</p>
+                <code style={{ display: "block", background: "rgba(0,0,0,0.2)", padding: "4px 8px", borderRadius: 4, margin: "6px 0", color: "#fbbf24" }}>
+                  http://localhost:3000 (hoặc cổng 3001)
+                </code>
+              </div>
+
+              <div style={{ background: "rgba(255, 255, 255, 0.02)", border: "1px solid var(--border)", padding: 12, borderRadius: 8 }}>
+                <strong>Cách khắc phục 2 (Cho IP LAN):</strong>
+                <ol style={{ paddingLeft: 16, marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
+                  <li>Sao chép đường dẫn: <code>chrome://flags/#unsafely-treat-insecure-origin-as-secure</code></li>
+                  <li>Dán vào thanh địa chỉ trình duyệt Chrome/Edge của bạn.</li>
+                  <li>Thêm địa chỉ IP LAN hiện tại (ví dụ: <code>http://192.168.1.5:3000</code>) vào ô danh sách.</li>
+                  <li>Chọn <strong>Enabled</strong>, nhấn <strong>Relaunch</strong> trình duyệt để áp dụng.</li>
+                </ol>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <button className="button primary" onClick={() => setShowCameraWarning(false)}>Đóng</button>
             </div>
           </div>
         </div>

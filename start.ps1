@@ -5,7 +5,10 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Set-Location $PSScriptRoot
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
 
 # 1. Activate Python virtual environment and check dependencies
 if (-not (Test-Path ".venv")) {
@@ -58,23 +61,18 @@ if (-not (Test-Path "node_modules")) {
     npm install
 }
 
-# Start Client 1 (Port 3000)
-Write-Host "Starting Frontend Client 1 (Buyer) on port $WebPort1..." -ForegroundColor Green
-$frontendCmd1 = "Set-Location `"$PSScriptRoot\frontend`"; & `".\node_modules\.bin\next`" dev --webpack --hostname 0.0.0.0 --port $WebPort1"
+# Start Frontend Client (Port 3000)
+Write-Host "Starting Frontend Client on port $WebPort1..." -ForegroundColor Green
+$frontendCmd1 = "Set-Location `"$PSScriptRoot\frontend`"; `$env:PORT=$WebPort1; & `".\node_modules\.bin\next`" dev --webpack --hostname 0.0.0.0 --port $WebPort1"
 Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $frontendCmd1 | Out-Null
 
-# Start Client 2 (Port 3001)
-Write-Host "Starting Frontend Client 2 (Seller) on port $WebPort2..." -ForegroundColor Green
-$frontendCmd2 = "Set-Location `"$PSScriptRoot\frontend`"; & `".\node_modules\.bin\next`" dev --webpack --hostname 0.0.0.0 --port $WebPort2"
-Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $frontendCmd2 | Out-Null
-
 Write-Host "`n==========================================================" -ForegroundColor Green
-Write-Host "🎉 CLIENT-SERVER SYSTEM STARTED SUCCESSFULLY (LOCAL)!" -ForegroundColor Green
+Write-Host "🎉 CLIENT-SERVER SYSTEM STARTED SUCCESSFULLY!" -ForegroundColor Green
 Write-Host "----------------------------------------------------------" -ForegroundColor Yellow
 Write-Host "• Backend API:  http://localhost:$ApiPort/docs (or http://$localIp`:$ApiPort/docs)"
-Write-Host "• Client 1 (Buyer):  http://localhost:$WebPort1 (or http://$localIp`:$WebPort1)"
-Write-Host "• Client 2 (Seller): http://localhost:$WebPort2 (or http://$localIp`:$WebPort2)"
-Write-Host "👉 LAN Access (for mobile debugging): http://$localIp`:$WebPort1" -ForegroundColor Green
-Write-Host "👉 Run .\add-client.ps1 to open another client." -ForegroundColor Cyan
-Write-Host "👉 Run .\stop.ps1 to stop all processes." -ForegroundColor Red
+Write-Host "• Frontend URL: http://localhost:$WebPort1 (or http://$localIp`:$WebPort1)"
+Write-Host "👉 LAN Access:  http://$localIp`:$WebPort1" -ForegroundColor Green
+Write-Host "👉 iOS/iPhone (Secure HTTPS): Run 'npx ngrok http $WebPort1' to get HTTPS URL." -ForegroundColor Green
+Write-Host "👉 Multi-user Demo: Open one normal tab and one Incognito (Private) tab pointing to the Frontend URL." -ForegroundColor Cyan
+Write-Host "👉 Run .\stop.ps1 to stop all backend and frontend processes." -ForegroundColor Red
 Write-Host "==========================================================" -ForegroundColor Green

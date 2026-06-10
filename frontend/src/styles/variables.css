@@ -3,7 +3,7 @@
 
 :root {
   /* Fonts */
-  --font-family-sans: 'Raleway', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+  --font-family-sans: var(--font-geist-sans), 'Raleway', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
   --font-sans: var(--font-family-sans);
   --font-weight-regular: 400;
   --font-weight-semibold: 600;
@@ -18,8 +18,10 @@
   /* Semantic tokens */
   --bg: var(--color-navy);
   --card-bg: #171826; /* slightly lighter than navy for elevated panels */
+  --bg-card: #171826; /* compatibility alias for --card-bg */
   --muted: #9aa0bd;
   --text: #e8eef8;
+  --text-inverse: #0f172a;
   --text-muted: #c8cee0;
   --text-secondary: #b8c4e0;
   --text-tertiary: #8a92b0;
@@ -34,6 +36,16 @@
   --bg-inset: rgba(103, 111, 157, 0.08);
   --bg-hover: rgba(103, 111, 157, 0.08);
   --ring-focus: rgba(249, 177, 122, 0.2);
+
+  /* Status Colors */
+  --success: #57ca7b;
+  --success-light: rgba(87, 202, 123, 0.12);
+  --danger: #ff6b6b;
+  --danger-light: rgba(255, 107, 107, 0.12);
+  --warning: #f59e0b;
+  --warning-light: rgba(245, 158, 11, 0.12);
+  --info: #3b82f6;
+  --info-light: rgba(59, 130, 246, 0.12);
 
   /* Spacing */
   --space-xs: 4px;

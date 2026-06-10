@@ -8,6 +8,9 @@ import type { Listing } from "@/lib/types";
 export interface UseListingOptions {
   search?: string;
   enabled?: boolean;
+  lat?: number;
+  lng?: number;
+  radius_km?: number;
 }
 
 export interface UseListingResult {
@@ -17,7 +20,7 @@ export interface UseListingResult {
   refetch: () => Promise<void>;
 }
 
-export function useListing({ search = "", enabled = true }: UseListingOptions = {}): UseListingResult {
+export function useListing({ search = "", enabled = true, lat, lng, radius_km }: UseListingOptions = {}): UseListingResult {
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,8 +30,17 @@ export function useListing({ search = "", enabled = true }: UseListingOptions = 
     if (search.trim()) {
       next.set("search", search.trim());
     }
+    if (lat !== undefined && lat !== null) {
+      next.set("lat", String(lat));
+    }
+    if (lng !== undefined && lng !== null) {
+      next.set("lng", String(lng));
+    }
+    if (radius_km !== undefined && radius_km !== null) {
+      next.set("radius_km", String(radius_km));
+    }
     return next;
-  }, [search]);
+  }, [search, lat, lng, radius_km]);
 
   const loadListings = useCallback(async () => {
     if (!enabled) {

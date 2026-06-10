@@ -16,7 +16,7 @@ fi
 
 echo "Đang khởi động Next.js client tại cổng $PORT..."
 cd frontend
-npm run dev -- --hostname 0.0.0.0 --port $PORT &
+PORT=$PORT npm run dev -- --hostname 0.0.0.0 --port $PORT &
 cd ..
 
 echo -e "\033[0;32mClient mới đang chạy tại: http://localhost:$PORT\033[0m"

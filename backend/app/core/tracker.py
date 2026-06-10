@@ -50,3 +50,22 @@ def track_request(request: Request) -> bool:
         active_clients[client_ip]["browser"] = browser
         
     return True
+
+# RAM Buffer for recent errors (Diagnostics)
+error_logs = []
+
+def log_system_error(ip: str, method: str, path: str, status_code: int, detail: str, source: str):
+    from datetime import datetime, UTC
+    log_entry = {
+        "timestamp": datetime.now(UTC).isoformat(),
+        "ip": ip,
+        "method": method,
+        "path": path,
+        "status_code": status_code,
+        "detail": str(detail),
+        "source": source
+    }
+    error_logs.insert(0, log_entry)
+    if len(error_logs) > 50:
+        error_logs.pop()
+

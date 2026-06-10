@@ -20,6 +20,8 @@ class ProfileRead(ORMModel):
     privacy_settings: dict | None = None
     banner_url: str | None = None
     shop_slug: str | None = None
+    lat: float | None = None
+    lng: float | None = None
 
 
 class ProfileUpdate(BaseModel):
@@ -34,6 +36,8 @@ class ProfileUpdate(BaseModel):
     privacy_settings: dict | None = Field(default=None)
     banner_url: str | None = Field(default=None, max_length=1024)
     shop_slug: str | None = Field(default=None, max_length=255)
+    lat: float | None = Field(default=None)
+    lng: float | None = Field(default=None)
 
 
 class UserRead(ORMModel):

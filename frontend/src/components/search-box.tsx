@@ -49,9 +49,13 @@ export function SearchBox() {
   };
 
   const handleSelect = (suggestion: string) => {
-    setQuery(suggestion);
+    let finalQuery = suggestion;
+    if (suggestion.startsWith("Tìm trong danh mục: ")) {
+      finalQuery = suggestion.substring("Tìm trong danh mục: ".length);
+    }
+    setQuery(finalQuery);
     setShowSuggestions(false);
-    router.push(`/?search=${encodeURIComponent(suggestion)}`);
+    router.push(`/?search=${encodeURIComponent(finalQuery)}`);
   };
 
   return (

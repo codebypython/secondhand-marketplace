@@ -1,4 +1,5 @@
 import type { AuthResponse, Block, Category, Conversation, Deal, Listing, Meetup, Offer, Report, User, UserPublic, ListingQuestion, Review, Wishlist, MapLegend } from "@/lib/types";
+import { translateError } from "@/lib/error-translator";
 
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -32,7 +33,22 @@ async function request<T>(path: string, init?: RequestInit, token?: string): Pro
   const text = await response.text();
   const data = text ? JSON.parse(text) : {};
   if (!response.ok) {
-    throw new ApiError(data.detail ?? "Request failed", response.status);
+    let errMsg = "Yêu cầu thất bại";
+    if (data.detail) {
+      if (typeof data.detail === "string") {
+        errMsg = translateError(undefined, data.detail);
+      } else if (Array.isArray(data.detail)) {
+        errMsg = data.detail.map((err: any) => {
+          const field = err.loc ? err.loc[err.loc.length - 1] : undefined;
+          return translateError(field, err.msg);
+        }).join(", ");
+      } else if (typeof data.detail === "object") {
+        errMsg = data.detail.message ? translateError(undefined, data.detail.message) : JSON.stringify(data.detail);
+      }
+    } else if (data.message) {
+      errMsg = translateError(undefined, data.message);
+    }
+    throw new ApiError(errMsg, response.status);
   }
   return data as T;
 }
@@ -46,7 +62,7 @@ export const api = {
   me: (token: string) => request<User>("/auth/me", undefined, token),
 
   // User
-  updateProfile: (token: string, payload: { full_name?: string; avatar_url?: string; bio?: string; display_name?: string; phone?: string; address?: string; dob?: string; shop_slug?: string; banner_url?: string; }) =>
+  updateProfile: (token: string, payload: { full_name?: string; avatar_url?: string; bio?: string; display_name?: string; phone?: string; address?: string; dob?: string; shop_slug?: string; banner_url?: string; lat?: number; lng?: number; }) =>
     request<User>("/users/me", { method: "PATCH", body: JSON.stringify(payload) }, token),
   getUser: (userId: string) => request<UserPublic>(`/users/${userId}`),
   getUserListings: (userId: string) => request<Listing[]>(`/users/${userId}/listings`),
@@ -166,6 +182,8 @@ export const api = {
     request<any[]>("/notifications", undefined, token),
   unreadCountNotifications: (token: string) =>
     request<{ count: number }>("/notifications/unread-count", undefined, token),
+  unreadCountMessages: (token: string) =>
+    request<{ count: number }>("/chat/unread-count", undefined, token),
   readNotification: (token: string, notificationId: string) =>
     request<any>(`/notifications/${notificationId}/read`, { method: "PATCH" }, token),
   readAllNotifications: (token: string) =>

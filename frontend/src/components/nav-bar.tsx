@@ -19,6 +19,17 @@ export function NavBar() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showDropdown, setShowDropdown] = useState(false);
+  
+  // Custom Avatar and Messages states
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
+
+  useEffect(() => {
+    if (!showAvatarDropdown) return;
+    const handleClose = () => setShowAvatarDropdown(false);
+    window.addEventListener("click", handleClose);
+    return () => window.removeEventListener("click", handleClose);
+  }, [showAvatarDropdown]);
 
   useEffect(() => {
     if (!token) return;
@@ -31,8 +42,11 @@ export function NavBar() {
 
         const listData = await api.listNotifications(token);
         setNotifications(listData);
+
+        const msgCountData = await api.unreadCountMessages(token);
+        setUnreadMessagesCount(msgCountData.count);
       } catch (e) {
-        console.error("Failed to fetch notifications:", e);
+        console.error("Failed to fetch notifications/messages:", e);
       }
     };
 
@@ -85,7 +99,11 @@ export function NavBar() {
     { href: "/", label: "Home" },
     { href: "/listings/new", label: "Create listing" },
     { href: "/dashboard/offers", label: "Transactions" },
-    { href: "/inbox", label: "Inbox" },
+    { 
+      href: "/inbox", 
+      label: unreadMessagesCount > 0 ? `Inbox (${unreadMessagesCount})` : "Inbox",
+      badge: unreadMessagesCount > 0
+    },
     ...(user?.role === "ADMIN" ? [{ href: "/moderation", label: "Moderation" }] : []),
     { href: "/profile", label: "Profile" },
   ];
@@ -118,8 +136,23 @@ export function NavBar() {
             href={link.href}
             className={pathname === link.href ? "nav-link active" : "nav-link"}
             onClick={() => setOpen(false)}
+            style={{ position: "relative" }}
           >
             {link.label}
+            {link.badge && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 8,
+                  height: 8,
+                  borderRadius: "50%",
+                  backgroundColor: "var(--danger, #ff6b6b)",
+                  position: "absolute",
+                  top: 0,
+                  right: -6,
+                }}
+              />
+            )}
           </Link>
         ))}
       </nav>
@@ -165,35 +198,35 @@ export function NavBar() {
                     position: "absolute",
                     top: "100%",
                     right: 0,
-                    width: 320,
-                    maxHeight: 400,
+                    width: 340,
+                    maxHeight: 420,
                     overflowY: "auto",
                     zIndex: 1000,
-                    marginTop: 8,
-                    boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
+                    marginTop: 10,
+                    boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
                     border: "1px solid var(--border)",
-                    backgroundColor: "var(--card-bg, #1e293b)",
-                    backdropFilter: "blur(12px)",
-                    borderRadius: "12px",
-                    padding: 12,
+                    backgroundColor: "var(--bg-card, #1e293b)",
+                    backdropFilter: "blur(16px)",
+                    borderRadius: "var(--radius-lg, 12px)",
+                    padding: 16,
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: "600" }}>Thông báo</h4>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: "700", color: "var(--text)" }}>Thông báo</h4>
                     {unreadCount > 0 && (
                       <button
                         className="button link sm"
                         onClick={handleMarkAllRead}
-                        style={{ fontSize: 12, padding: 0, color: "var(--primary)" }}
+                        style={{ fontSize: 12, padding: 0, color: "var(--accent)", background: "transparent", border: "none", cursor: "pointer", fontWeight: "600" }}
                         type="button"
                       >
                         Đọc tất cả
                       </button>
                     )}
                   </div>
-                  <div className="divider" style={{ margin: "5px 0 10px 0", height: 1, backgroundColor: "var(--border)" }} />
+                  <div className="divider" style={{ margin: "8px 0 12px 0", height: 1, backgroundColor: "var(--border)" }} />
                   {notifications.length === 0 ? (
-                    <p className="muted" style={{ fontSize: 13, textAlign: "center", padding: "20px 0" }}>
+                    <p className="muted" style={{ fontSize: 13, textAlign: "center", padding: "24px 0" }}>
                       Không có thông báo nào.
                     </p>
                   ) : (
@@ -203,23 +236,24 @@ export function NavBar() {
                           key={notif.id}
                           onClick={() => handleNotificationClick(notif)}
                           style={{
-                            padding: 10,
-                            borderRadius: "8px",
-                            backgroundColor: notif.is_read ? "transparent" : "rgba(99, 102, 241, 0.08)",
-                            border: notif.is_read ? "1px solid rgba(255,255,255,0.03)" : "1px solid rgba(99, 102, 241, 0.2)",
+                            padding: 12,
+                            borderRadius: "var(--radius-md, 8px)",
+                            backgroundColor: notif.is_read ? "transparent" : "rgba(249, 177, 122, 0.06)",
+                            border: notif.is_read ? "1px solid var(--border)" : "1px solid rgba(249, 177, 122, 0.25)",
                             cursor: "pointer",
                             fontSize: 13,
-                            transition: "all 0.2s"
+                            transition: "all var(--transition)",
+                            marginBottom: 4
                           }}
                           className="notification-item"
                         >
-                          <div style={{ fontWeight: notif.is_read ? "normal" : "600", marginBottom: 3, color: "var(--text)" }}>
+                          <div style={{ fontWeight: notif.is_read ? "500" : "700", marginBottom: 6, color: "var(--text)", lineHeight: 1.35 }}>
                             {notif.title}
                           </div>
-                          <p style={{ margin: 0, color: "var(--text-secondary, #94a3b8)", fontSize: 12, lineHeight: 1.4 }}>
+                          <p style={{ margin: 0, color: "var(--text-secondary)", fontSize: 12, lineHeight: 1.5 }}>
                             {notif.message}
                           </p>
-                          <span style={{ fontSize: 10, color: "var(--text-muted, #64748b)", marginTop: 5, display: "block" }}>
+                          <span style={{ fontSize: 10, color: "var(--text-tertiary)", marginTop: 8, display: "block" }}>
                             {new Date(notif.created_at).toLocaleTimeString("vi-VN", { hour: '2-digit', minute: '2-digit' })} - {new Date(notif.created_at).toLocaleDateString("vi-VN")}
                           </span>
                         </div>
@@ -230,11 +264,116 @@ export function NavBar() {
               )}
             </div>
 
-            <div className="user-avatar">{initials}</div>
-            <span style={{ marginRight: 10 }}>{user.profile?.full_name ?? user.email}</span>
-            <button className="button ghost sm" onClick={logout} type="button">
-              Sign out
-            </button>
+            <div style={{ position: "relative", display: "inline-block" }}>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowAvatarDropdown(!showAvatarDropdown);
+                }}
+                className="user-avatar-btn"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <div className="user-avatar" style={{ margin: 0 }}>{initials}</div>
+                <span style={{ color: "var(--text)", fontWeight: 500, marginRight: 10 }}>{user.profile?.full_name ?? user.email}</span>
+              </button>
+
+              {showAvatarDropdown && (
+                <div
+                  className="avatar-dropdown-panel"
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    right: 0,
+                    width: 200,
+                    zIndex: 1001,
+                    marginTop: 8,
+                    boxShadow: "var(--shadow-lg)",
+                    border: "1px solid var(--border)",
+                    backgroundColor: "var(--bg-card, #171826)",
+                    backdropFilter: "blur(16px)",
+                    borderRadius: "var(--radius)",
+                    padding: "8px 0",
+                    display: "flex",
+                    flexDirection: "column"
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", marginBottom: 4 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>
+                      {user.profile?.full_name ?? user.email}
+                    </div>
+                    <div className="muted" style={{ fontSize: 11, wordBreak: "break-all" }}>
+                      {user.email}
+                    </div>
+                  </div>
+                  
+                  <Link
+                    href="/profile"
+                    className="dropdown-item"
+                    onClick={() => setShowAvatarDropdown(false)}
+                    style={{ padding: "8px 16px", fontSize: 13, color: "var(--text)", textDecoration: "none", display: "block" }}
+                  >
+                    👤 Hồ sơ cá nhân
+                  </Link>
+                  <Link
+                    href="/dashboard/offers"
+                    className="dropdown-item"
+                    onClick={() => setShowAvatarDropdown(false)}
+                    style={{ padding: "8px 16px", fontSize: 13, color: "var(--text)", textDecoration: "none", display: "block" }}
+                  >
+                    💼 Giao dịch của tôi
+                  </Link>
+                  <Link
+                    href="/listings/new"
+                    className="dropdown-item"
+                    onClick={() => setShowAvatarDropdown(false)}
+                    style={{ padding: "8px 16px", fontSize: 13, color: "var(--text)", textDecoration: "none", display: "block" }}
+                  >
+                    ＋ Đăng tin mới
+                  </Link>
+                  <Link
+                    href="/profile/recycle-bin"
+                    className="dropdown-item"
+                    onClick={() => setShowAvatarDropdown(false)}
+                    style={{ padding: "8px 16px", fontSize: 13, color: "var(--text)", textDecoration: "none", display: "block" }}
+                  >
+                    🗑️ Thùng rác (Tin đã xóa)
+                  </Link>
+                  
+                  <div className="divider" style={{ margin: "4px 0", height: 1, backgroundColor: "var(--border)" }} />
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAvatarDropdown(false);
+                      logout();
+                    }}
+                    style={{
+                      background: "transparent",
+                      border: "none",
+                      textAlign: "left",
+                      width: "100%",
+                      padding: "8px 16px",
+                      fontSize: 13,
+                      color: "var(--danger, #ff6b6b)",
+                      cursor: "pointer",
+                      display: "block"
+                    }}
+                  >
+                    🚪 Đăng xuất
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         ) : (
           <>

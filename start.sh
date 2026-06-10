@@ -70,23 +70,19 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-echo "Đang khởi động Frontend Client 1 (Buyer) ở cổng $WEB_PORT1..."
-npm run dev -- --hostname 0.0.0.0 --port $WEB_PORT1 &
+echo "Đang khởi động Frontend Client ở cổng $WEB_PORT1..."
+PORT=$WEB_PORT1 npm run dev -- --hostname 0.0.0.0 --port $WEB_PORT1 &
 CLIENT1_PID=$!
-
-echo "Đang khởi động Frontend Client 2 (Seller) ở cổng $WEB_PORT2..."
-npm run dev -- --hostname 0.0.0.0 --port $WEB_PORT2 &
-CLIENT2_PID=$!
 cd ..
 
 echo -e "\n=========================================================="
-echo "🎉 HỆ THỐNG ĐÃ KHỞI ĐỘNG THÀNH CÔNG (CỤC BỘ)!"
+echo "🎉 HỆ THỐNG ĐÃ KHỞI ĐỘNG THÀNH CÔNG!"
 echo "----------------------------------------------------------"
 echo "• Backend API:  http://localhost:$API_PORT/docs (hoặc http://$LOCAL_IP:$API_PORT/docs)"
-echo "• Client 1:     http://localhost:$WEB_PORT1 (hoặc http://$LOCAL_IP:$WEB_PORT1)"
-echo "• Client 2:     http://localhost:$WEB_PORT2 (hoặc http://$LOCAL_IP:$WEB_PORT2)"
-echo -e "\033[0;32m👉 LAN Access:  http://$LOCAL_IP:$WEB_PORT1\033[0m"
-echo -e "\033[0;36m👉 Chạy ./add-client.sh để kết nối thêm Client\033[0m"
+echo "• Frontend URL: http://localhost:$WEB_PORT1 (hoặc http://$LOCAL_IP:$WEB_PORT1)"
+echo -e "\033[0;32m👉 Truy cập LAN: http://$LOCAL_IP:$WEB_PORT1\033[0m"
+echo -e "\033[0;32m👉 iOS/iPhone (Bảo mật HTTPS): Chạy 'npx ngrok http $WEB_PORT1' để lấy link HTTPS.\033[0m"
+echo -e "\033[0;36m👉 Demo 2 tài khoản: Mở 1 tab thường và 1 tab ẩn danh truy cập Frontend URL.\033[0m"
 echo "----------------------------------------------------------"
 echo "Để tắt toàn bộ tiến trình chạy ngầm, hãy chạy ./stop.sh"
 echo "=========================================================="

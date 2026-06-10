@@ -1,10 +1,13 @@
-﻿﻿param(
+﻿param(
     [switch]$NoTest,     # Skip tests and build checks
     [switch]$NoPush      # Perform commit but skip git push
 )
 
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Set-Location $PSScriptRoot
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
 
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "🚀 CHUẨN HÓA & ĐĂNG MÃ NGUỒN LÊN GITHUB (COMMIT CHUYÊN NGHIỆP)" -ForegroundColor Cyan

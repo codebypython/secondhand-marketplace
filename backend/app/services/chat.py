@@ -98,3 +98,35 @@ def soft_delete_message(session: Session, user: User, message_id) -> None:
         session.add(message)
         session.commit()
 
+
+def count_unread_conversations(session: Session, user: User) -> int:
+    from sqlalchemy import func, not_
+    stmt = (
+        select(func.count(Conversation.id.distinct()))
+        .join(Conversation.participants)
+        .join(Conversation.messages)
+        .where(
+            User.id == user.id,
+            Message.sender_id != user.id,
+            Message.status != "read",
+            not_(Message.deleted_by.any(User.id == user.id))
+        )
+    )
+    return session.scalar(stmt) or 0
+
+
+def mark_conversation_as_read(session: Session, conversation_id, user: User) -> None:
+    stmt = (
+        select(Message)
+        .where(
+            Message.conversation_id == conversation_id,
+            Message.sender_id != user.id,
+            Message.status != "read"
+        )
+    )
+    unread_messages = session.scalars(stmt).all()
+    if unread_messages:
+        for msg in unread_messages:
+            msg.status = "read"
+        session.commit()
+

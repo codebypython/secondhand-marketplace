@@ -32,6 +32,7 @@ export default function NewListingPage() {
   const [imageUrls, setImageUrls] = useState<string[]>([""]);
   const [videoUrl, setVideoUrl] = useState("");
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  const [uploadingImageIndex, setUploadingImageIndex] = useState<number | null>(null);
   const [location, setLocation] = useState<{ lat: number; lng: number; address?: string; symbol_type?: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -226,13 +227,45 @@ export default function NewListingPage() {
         <div className="field">
           <label>Hình ảnh (URL)</label>
           {imageUrls.map((url, i) => (
-            <div key={i} style={{ display: "flex", gap: 8 }}>
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <input
                 placeholder="https://example.com/photo.jpg"
                 value={url}
                 onChange={(e) => updateImageUrl(i, e.target.value)}
                 style={{ flex: 1 }}
               />
+              <label 
+                className="button secondary sm" 
+                style={{ 
+                  cursor: uploadingImageIndex === i ? "not-allowed" : "pointer", 
+                  display: "flex", 
+                  alignItems: "center", 
+                  gap: 4,
+                  padding: "6px 12px",
+                  margin: 0
+                }}
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    if (!e.target.files || e.target.files.length === 0) return;
+                    setUploadingImageIndex(i);
+                    try {
+                      const res = await api.uploadMedia(token, e.target.files[0]);
+                      updateImageUrl(i, res.url);
+                      showToast("Tải lên ảnh thành công!", "success");
+                    } catch (err) {
+                      showToast(err instanceof Error ? err.message : "Tải lên ảnh thất bại.", "danger");
+                    } finally {
+                      setUploadingImageIndex(null);
+                    }
+                  }}
+                  disabled={uploadingImageIndex === i}
+                  style={{ display: "none" }}
+                />
+                {uploadingImageIndex === i ? "Đang tải..." : "📁 Tải ảnh"}
+              </label>
               {imageUrls.length > 1 ? (
                 <button type="button" className="button ghost sm" onClick={() => removeImageUrl(i)}>✕</button>
               ) : null}

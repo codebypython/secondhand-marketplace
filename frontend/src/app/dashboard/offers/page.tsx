@@ -30,6 +30,13 @@ function DealStatusBadge({ status }: { status: string }) {
 
 const DEAL_STEPS = ["Chấp nhận", "Hẹn gặp / Giao hàng", "Hoàn thành"];
 
+const deliveryStatusLabels: Record<string, string> = {
+  PENDING: "Chờ giao hàng",
+  SHIPPING: "Đang giao",
+  DELIVERED: "Đã giao",
+  CANCELLED: "Đã hủy"
+};
+
 export default function OffersDashboardPage() {
   const { token, user } = useAuth();
   const [tab, setTab] = useState<Tab>("sent");
@@ -326,7 +333,7 @@ export default function OffersDashboardPage() {
                       </div>
                       {deal.delivery_status !== "PENDING" && (
                         <div className="inline" style={{ marginTop: 4 }}>
-                          <span className="badge badge-warning">Giao hàng: {deal.delivery_status}</span>
+                          <span className="badge badge-warning">Giao hàng: {deliveryStatusLabels[deal.delivery_status] ?? deal.delivery_status}</span>
                           {deal.tracking_code && <span className="muted" style={{ fontSize: 12 }}>Mã vận đơn: {deal.tracking_code}</span>}
                         </div>
                       )}

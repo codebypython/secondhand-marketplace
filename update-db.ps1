@@ -1,4 +1,4 @@
-﻿param(
+﻿﻿param(
     [switch]$NoSeed       # Skip seeding mock data after reset
 )
 

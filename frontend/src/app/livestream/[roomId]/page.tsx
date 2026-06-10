@@ -9,7 +9,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import type { Listing } from "@/lib/types";
 import WishlistButton from "@/components/product/WishlistButton";
 import { showToast } from "@/components/toast";
-import { getMediaUrl } from "@/lib/utils";
+import { getMediaUrl, getWebSocketUrl } from "@/lib/utils";
 
 interface FloatingHeart {
   id: number;
@@ -196,21 +196,7 @@ export default function LivestreamRoomPage() {
     }
 
     // B. Socket setup
-    let wsUrl = "";
-    if (process.env.NEXT_PUBLIC_API_URL) {
-      const wsBase = process.env.NEXT_PUBLIC_API_URL.replace(/^http/, "ws");
-      wsUrl = `${wsBase}/chat/ws/${token}`;
-    } else if (typeof window !== "undefined") {
-      const isSecure = window.location.protocol === "https:";
-      const wsProtocol = isSecure ? "wss:" : "ws:";
-      if (isSecure) {
-        wsUrl = `${wsProtocol}//${window.location.host}/api/v1/chat/ws/${token}`;
-      } else {
-        wsUrl = `${wsProtocol}//${window.location.hostname}:8000/api/v1/chat/ws/${token}`;
-      }
-    } else {
-      wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/${token}`;
-    }
+    const wsUrl = getWebSocketUrl(token);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

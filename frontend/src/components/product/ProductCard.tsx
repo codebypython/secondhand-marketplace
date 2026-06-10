@@ -33,7 +33,7 @@ export interface ProductCardProps {
 
 export const ProductCard: React.FC<ProductCardProps> = ({ listing, onClick }) => {
   const firstImage = getMediaUrl(listing.image_urls?.[0]);
-  const ownerName = listing.owner?.profile?.display_name || listing.owner?.email || 'Unknown';
+  const ownerName = listing.owner?.profile?.display_name || listing.owner?.email || 'Người dùng';
   const ownerInitial = ownerName.charAt(0).toUpperCase();
 
   return (

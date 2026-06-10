@@ -8,12 +8,25 @@ import { PageShell } from "@/components/page-shell";
 import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Block, Report, Deal, MapLegend } from "@/lib/types";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, getApiBaseUrl } from "@/lib/utils";
 
 const targetLabels: Record<string, string> = {
   USER: "Người dùng",
   LISTING: "Tin đăng",
   MESSAGE: "Tin nhắn",
+};
+
+const listingStatusLabels: Record<string, string> = {
+  AVAILABLE: "Còn hàng",
+  SOLD: "Đã bán",
+  RESERVED: "Đã đặt trước",
+  HIDDEN: "Đã ẩn"
+};
+
+const dealStatusLabels: Record<string, string> = {
+  OPEN: "Đang giao dịch",
+  COMPLETED: "Hoàn thành",
+  CANCELLED: "Đã hủy"
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -76,7 +89,7 @@ export default function ModerationPage() {
   const downloadCSV = async (endpoint: string, filename: string) => {
     if (!token) return;
     try {
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1"}${endpoint}`, {
+      const resp = await fetch(`${getApiBaseUrl()}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!resp.ok) throw new Error("Export failed");
@@ -613,7 +626,7 @@ export default function ModerationPage() {
                       return (
                         <div key={status} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                           <div className="split" style={{ fontSize: 12 }}>
-                            <span>{status}</span>
+                            <span>{listingStatusLabels[status] ?? status}</span>
                             <strong>{count} tin ({percent.toFixed(0)}%)</strong>
                           </div>
                           <div style={{ width: "100%", height: 6, background: "var(--bg-inset)", borderRadius: 3, overflow: "hidden" }}>
@@ -642,7 +655,7 @@ export default function ModerationPage() {
                         return (
                           <div key={status} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                             <div className="split" style={{ fontSize: 12 }}>
-                              <span>{status}</span>
+                              <span>{dealStatusLabels[status] ?? status}</span>
                               <strong>{count} đơn ({percent.toFixed(0)}%)</strong>
                             </div>
                             <div style={{ width: "100%", height: 6, background: "var(--bg-inset)", borderRadius: 3, overflow: "hidden" }}>

@@ -8,7 +8,7 @@ export interface ChatMessageProps {
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, isOwn = false }) => {
-  const senderName = message.sender?.profile?.display_name || message.sender?.email || 'Unknown';
+  const senderName = message.sender?.profile?.display_name || message.sender?.email || 'Người dùng';
   const time = new Date(message.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
   return (

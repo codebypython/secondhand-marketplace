@@ -9,7 +9,7 @@ import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Conversation, Message } from "@/lib/types";
 import Link from "next/link";
-import { getInitials, timeAgo, formatPrice, getMediaUrl } from "@/lib/utils";
+import { getInitials, timeAgo, formatPrice, getMediaUrl, getWebSocketUrl } from "@/lib/utils";
 import styles from "./inbox.module.css";
 
 export default function InboxPage() {
@@ -113,21 +113,7 @@ export default function InboxPage() {
   useEffect(() => {
     if (!token) return;
 
-    let wsUrl = "";
-    if (process.env.NEXT_PUBLIC_API_URL) {
-      const wsBase = process.env.NEXT_PUBLIC_API_URL.replace(/^http/, "ws");
-      wsUrl = `${wsBase}/chat/ws/${token}`;
-    } else if (typeof window !== "undefined") {
-      const isSecure = window.location.protocol === "https:";
-      const wsProtocol = isSecure ? "wss:" : "ws:";
-      if (isSecure) {
-        wsUrl = `${wsProtocol}//${window.location.host}/api/v1/chat/ws/${token}`;
-      } else {
-        wsUrl = `${wsProtocol}//${window.location.hostname}:8000/api/v1/chat/ws/${token}`;
-      }
-    } else {
-      wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/${token}`;
-    }
+    const wsUrl = getWebSocketUrl(token);
 
     console.log("Connecting to WebSocket:", wsUrl);
     const ws = new WebSocket(wsUrl);

@@ -1,0 +1,253 @@
+@startuml Domain Model - Secondhand Marketplace
+
+' --- CẤU HÌNH THỂ HIỆN SƠ ĐỒ ĐẸP (KHÔNG LỖI) ---
+skinparam linetype ortho          ' Đường nối vuông góc, gọn gàng
+skinparam classAttributeIconSize 0 ' Hiện ký hiệu (+), (-) thay vì icon tròn màu sắc
+skinparam shadowing true          ' Đổ bóng các hộp lớp tạo chiều sâu
+skinparam handwritten false       ' Font chữ tiêu chuẩn thẳng hàng chuyên nghiệp
+
+' Tông màu chuyên nghiệp (Ocean Blue & Light Grey)
+skinparam class {
+    BackgroundColor #F4F9FF
+    BorderColor #2B6CB0
+    ArrowColor #2D3748
+    FontName "Segoe UI"
+    FontSize 12
+}
+skinparam package {
+    BackgroundColor #F8FAFC
+    BorderColor #CBD5E1
+    FontName "Segoe UI"
+    FontStyle bold
+}
+
+' --- CÁC ĐỊNH NGHĨA LỚP TRONG TỪNG AGGREGATE ---
+
+package "User Aggregate" {
+  class User {
+    - email: String
+    - password_hash: String
+    - role: UserRole
+    - status: UserStatus
+    - reset_token: String
+    - reset_token_expires: DateTime
+    --
+    + validate_email(key, value): String
+    + ensure_active(): void
+  }
+  
+  class Profile {
+    - user_id: UUID
+    - full_name: String
+    - avatar_url: String
+    - bio: String
+    - display_name: String
+    - phone: String
+    - address: String
+    - dob: Date
+    - social_links: dict
+    - privacy_settings: dict
+    - banner_url: String
+    - shop_slug: String
+    - lat: Float
+    - lng: Float
+  }
+}
+
+package "Listing Aggregate" {
+  class Category {
+    - name: String
+    - slug: String
+    - image_url: String
+    - parent_id: UUID
+  }
+  
+  class Listing {
+    - owner_id: UUID
+    - category_id: UUID
+    - title: String
+    - description: String
+    - price: Decimal
+    - condition: ItemCondition
+    - brand: String
+    - has_warranty: Boolean
+    - location_data: dict
+    - image_urls: list
+    - video_url: String
+    - status: ListingStatus
+    --
+    + is_available(): Boolean
+    + reserve(): void
+    + mark_sold(): void
+    + reopen(): void
+  }
+}
+
+package "Conversation Aggregate" {
+  class Conversation {
+    - listing_id: UUID
+    - title: String
+  }
+  
+  class Message {
+    - conversation_id: UUID
+    - sender_id: UUID
+    - content: String
+    - status: String
+  }
+}
+
+package "Deal Aggregate" {
+  class Offer {
+    - listing_id: UUID
+    - buyer_id: UUID
+    - price: Decimal
+    - status: OfferStatus
+    - parent_offer_id: UUID
+    - is_counter_from_seller: Boolean
+    - expires_at: DateTime
+    --
+    + accept(): Deal
+    + decline(): void
+    + cancel(): void
+  }
+  
+  class Deal {
+    - listing_id: UUID
+    - buyer_id: UUID
+    - seller_id: UUID
+    - agreed_price: Decimal
+    - status: DealStatus
+    - delivery_status: DeliveryStatus
+    - tracking_code: String
+    - has_dispute: Boolean
+    - dispute_reason: String
+    --
+    + complete(listing): void
+    + cancel(listing): void
+  }
+  
+  class Meetup {
+    - deal_id: UUID
+    - scheduled_at: DateTime
+    - location: dict
+    - status: MeetupStatus
+    - buyer_checked_in: Boolean
+    - seller_checked_in: Boolean
+  }
+}
+
+package "Moderation Aggregate" {
+  class Report {
+    - reporter_id: UUID
+    - target_type: ReportTargetType
+    - target_id: UUID
+    - reason: String
+    - status: ReportStatus
+  }
+  
+  class Block {
+    - blocker_id: UUID
+    - blocked_id: UUID
+  }
+}
+
+package "Social Aggregate" {
+  class UserFollow {
+    - follower_id: UUID
+    - following_id: UUID
+  }
+  
+  class Review {
+    - reviewer_id: UUID
+    - target_id: UUID
+    - deal_id: UUID
+    - rating: Integer
+    - comment: String
+  }
+  
+  class Wishlist {
+    - user_id: UUID
+    - name: String
+    - is_public: Boolean
+  }
+  
+  class WishlistItem {
+    - wishlist_id: UUID
+    - listing_id: UUID
+  }
+  
+  class ListingQuestion {
+    - listing_id: UUID
+    - asker_id: UUID
+    - question: String
+    - answer: String
+  }
+}
+
+package "System Logs & Notifications" {
+  class Notification {
+    - recipient_id: UUID
+    - type: NotificationType
+    - title: String
+    - message: String
+    - link: String
+    - is_read: Boolean
+  }
+  
+  class ActivityLog {
+    - actor_id: UUID
+    - verb: String
+    - target_type: String
+    - target_id: String
+    - details: dict
+  }
+}
+
+' --- CÁC MỐI QUAN HỆ (ĐẶT NGOÀI CÁC PACKAGE ĐỂ TRÁNH LỖI GRAPHVIZ DOT) ---
+' Sử dụng chuẩn Class Diagram với bản số (multiplicities) thay cho ký hiệu ERD chân chim
+
+' User Aggregate Relations
+User "1" -- "0..1" Profile : has
+
+' Listing Aggregate Relations
+Category "1" -- "*" Category : parent/children
+Category "1" -- "*" Listing : categorizes
+User "1" -- "*" Listing : sells
+User "1" -- "*" Listing : favorites (secondary relationship)
+
+' Conversation Aggregate Relations
+Conversation "1" -- "*" Message : contains
+User "1" -- "*" Message : sends
+User "*" -- "*" Conversation : participates (secondary relationship)
+Listing "1" -- "0..1" Conversation : discussed_in
+
+' Deal Aggregate Relations
+Listing "1" -- "*" Offer : receives
+User "1" -- "*" Offer : makes
+Offer "1" -- "0..1" Deal : creates
+Deal "1" -- "*" Meetup : schedules
+User "1" -- "*" Deal : participates_as_buyer
+User "1" -- "*" Deal : participates_as_seller
+
+' Moderation Aggregate Relations
+User "1" -- "*" Report : reporter
+User "1" -- "*" Block : blocker
+User "1" -- "*" Block : blocked
+
+' Social Aggregate Relations
+User "1" -- "*" UserFollow : followers
+User "1" -- "*" UserFollow : following
+User "1" -- "*" Review : reviewer
+User "1" -- "*" Review : target
+Wishlist "1" -- "*" WishlistItem : contains
+WishlistItem "*" -- "1" Listing : references
+User "1" -- "*" Wishlist : owns
+Listing "1" -- "*" ListingQuestion : has
+User "1" -- "*" ListingQuestion : asker
+
+' System Notifications & Logs
+User "1" -- "*" Notification : recipient
+User "1" -- "*" ActivityLog : actor
+
+@enduml

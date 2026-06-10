@@ -567,7 +567,7 @@ def seed():
             owner = next(u for u in users if str(u.id) == str(listing.owner_id))
             conv = Conversation(
                 listing_id=str(listing.id),
-                title=f"Question about: {listing.title[:40]}",
+                title=f"Hỏi về: {listing.title[:40]}",
                 created_at=listing.created_at + timedelta(hours=random.randint(1, 24)),
                 updated_at=listing.created_at + timedelta(hours=random.randint(1, 24)),
             )
@@ -615,7 +615,7 @@ def seed():
             reporter_id=str(reporter.id),
             target_type=ReportTargetType.LISTING,
             target_id=listing_to_report.id,
-            reason="Product image seems to be copied, not matching description.",
+            reason="Hình ảnh sản phẩm dường như được sao chép, không khớp với mô tả.",
             status=ReportStatus.PENDING,
             created_at=listing_to_report.created_at + timedelta(days=2),
             updated_at=listing_to_report.created_at + timedelta(days=2),

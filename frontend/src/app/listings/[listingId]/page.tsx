@@ -9,7 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { showToast } from "@/components/toast";
 import { api } from "@/lib/api";
 import type { Listing } from "@/lib/types";
-import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo, getMediaUrl } from "@/lib/utils";
+import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo, getMediaUrl, getWebSocketUrl } from "@/lib/utils";
 import { LocationDisplay } from "@/components/location-display";
 import { Video, Tv, X } from "lucide-react";
 import WishlistButton from "@/components/product/WishlistButton";
@@ -255,21 +255,7 @@ export default function ListingDetailPage() {
   useEffect(() => {
     if (!token) return;
 
-    let wsUrl = "";
-    if (process.env.NEXT_PUBLIC_API_URL) {
-      const wsBase = process.env.NEXT_PUBLIC_API_URL.replace(/^http/, "ws");
-      wsUrl = `${wsBase}/chat/ws/${token}`;
-    } else if (typeof window !== "undefined") {
-      const isSecure = window.location.protocol === "https:";
-      const wsProtocol = isSecure ? "wss:" : "ws:";
-      if (isSecure) {
-        wsUrl = `${wsProtocol}//${window.location.host}/api/v1/chat/ws/${token}`;
-      } else {
-        wsUrl = `${wsProtocol}//${window.location.hostname}:8000/api/v1/chat/ws/${token}`;
-      }
-    } else {
-      wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/${token}`;
-    }
+    const wsUrl = getWebSocketUrl(token);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;

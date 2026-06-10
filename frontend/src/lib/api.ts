@@ -1,10 +1,9 @@
 import type { AuthResponse, Block, Category, Conversation, Deal, Listing, Meetup, Offer, Report, User, UserPublic, ListingQuestion, Review, Wishlist, MapLegend } from "@/lib/types";
 import { translateError } from "@/lib/error-translator";
+import { getApiBaseUrl } from "@/lib/utils";
 
 
-const API_BASE = typeof window === "undefined"
-  ? "http://127.0.0.1:8000/api/v1"
-  : (process.env.NEXT_PUBLIC_API_URL ?? "/api/v1");
+const API_BASE = getApiBaseUrl();
 
 export class ApiError extends Error {
   status: number;

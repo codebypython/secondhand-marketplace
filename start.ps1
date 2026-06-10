@@ -33,11 +33,30 @@ if (-not (Test-Path ".\frontend\.env.local") -and (Test-Path ".\frontend\.env.ex
 # 3. Detect local network IP (LAN IP) for mobile/LAN access
 $localIp = "127.0.0.1"
 try {
-    $localIp = (Get-NetIPAddress | Where-Object { $_.AddressState -eq "Preferred" -and $_.AddressFamily -eq "IPv4" -and $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } | Select-Object -First 1).IPAddress
+    # Prioritize the interface index that handles the default internet gateway routing
+    $activeRoute = Get-NetRoute -DestinationPrefix "0.0.0.0/0" | Sort-Object RouteMetric | Select-Object -First 1
+    if ($activeRoute) {
+        $localIp = (Get-NetIPAddress -InterfaceIndex $activeRoute.InterfaceIndex -AddressFamily IPv4).IPAddress
+    }
 } catch {}
+
+# Ensure the IP is not a loopback, link-local (169.254.x.x) or virtual network adapter IP
+if ($localIp -eq "127.0.0.1" -or $localIp -like "169.254.*" -or $localIp -like "192.168.137.*" -or $localIp -like "192.168.56.*") {
+    try {
+        $localIp = (Get-NetIPAddress | Where-Object { 
+            $_.AddressState -eq "Preferred" -and 
+            $_.AddressFamily -eq "IPv4" -and 
+            $_.IPAddress -notlike "127.*" -and 
+            $_.IPAddress -notlike "169.254.*" -and 
+            $_.IPAddress -notlike "192.168.137.*" -and 
+            $_.IPAddress -notlike "192.168.56.*" 
+        } | Select-Object -First 1).IPAddress
+    } catch {}
+}
 if (-not $localIp) { $localIp = "127.0.0.1" }
 
-# Update API URL in frontend config
+
+# Update API URL in frontend config and backend CORS config
 if ($localIp -ne "127.0.0.1") {
     Write-Host "Detected LAN IP: $localIp" -ForegroundColor Green
     $envFile = "$PSScriptRoot\frontend\.env.local"
@@ -46,6 +65,13 @@ if ($localIp -ne "127.0.0.1") {
         $content = $content -replace "NEXT_PUBLIC_API_URL=.*", "NEXT_PUBLIC_API_URL=http://$localIp`:$ApiPort/api/v1"
         $content | Set-Content $envFile
         Write-Host "Updated frontend/.env.local NEXT_PUBLIC_API_URL to http://$localIp`:$ApiPort/api/v1" -ForegroundColor Cyan
+    }
+    $backendEnvFile = "$PSScriptRoot\backend\.env"
+    if (Test-Path $backendEnvFile) {
+        $bContent = Get-Content $backendEnvFile
+        $bContent = $bContent -replace 'BACKEND_CORS_ORIGINS=.*', "BACKEND_CORS_ORIGINS=[`"http://localhost:3000`",`"http://127.0.0.1:3000`",`"http://$localIp`:3000`",`"http://$localIp`:3001`"]"
+        $bContent | Set-Content $backendEnvFile
+        Write-Host "Updated backend/.env BACKEND_CORS_ORIGINS to include LAN IP" -ForegroundColor Cyan
     }
 }
 

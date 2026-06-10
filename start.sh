@@ -34,10 +34,11 @@ fi
 
 # 3. Detect LAN IP address
 LOCAL_IP="127.0.0.1"
-if command -v hostname >/dev/null 2>&1; then
-    LOCAL_IP=$(hostname -I | awk '{print $1}')
-elif command -v ip >/dev/null 2>&1; then
+if command -v ip >/dev/null 2>&1; then
     LOCAL_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7}')
+fi
+if [ -z "$LOCAL_IP" ] && command -v hostname >/dev/null 2>&1; then
+    LOCAL_IP=$(hostname -I | awk '{print $1}')
 fi
 if [ -z "$LOCAL_IP" ]; then
     LOCAL_IP="127.0.0.1"
@@ -53,6 +54,16 @@ if [ "$LOCAL_IP" != "127.0.0.1" ]; then
             sed -i '' "s|NEXT_PUBLIC_API_URL=.*|NEXT_PUBLIC_API_URL=http://$LOCAL_IP:$API_PORT/api/v1|g" "$ENV_FILE"
         fi
         echo -e "\033[0;36mUpdated frontend/.env.local NEXT_PUBLIC_API_URL to http://$LOCAL_IP:$API_PORT/api/v1\033[0m"
+    fi
+    BACKEND_ENV_FILE="backend/.env"
+    if [ -f "$BACKEND_ENV_FILE" ]; then
+        CORS_VAL="[\"http://localhost:3000\",\"http://127.0.0.1:3000\",\"http://$LOCAL_IP:3000\",\"http://$LOCAL_IP:3001\"]"
+        if sed --version >/dev/null 2>&1; then
+            sed -i "s|BACKEND_CORS_ORIGINS=.*|BACKEND_CORS_ORIGINS=$CORS_VAL|g" "$BACKEND_ENV_FILE"
+        else
+            sed -i '' "s|BACKEND_CORS_ORIGINS=.*|BACKEND_CORS_ORIGINS=$CORS_VAL|g" "$BACKEND_ENV_FILE"
+        fi
+        echo -e "\033[0;36mUpdated backend/.env BACKEND_CORS_ORIGINS to include LAN IP\033[0m"
     fi
 fi
 

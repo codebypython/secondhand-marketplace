@@ -63,12 +63,77 @@ export const statusLabels: Record<string, string> = {
   HIDDEN: "Ẩn",
 };
 
+export function getApiBaseUrl(): string {
+  if (typeof window === "undefined") {
+    return "http://127.0.0.1:8000/api/v1";
+  }
+  
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (!envUrl) {
+    return "/api/v1";
+  }
+
+  try {
+    const parsed = new URL(envUrl);
+    const browserHostname = window.location.hostname;
+    
+    if (browserHostname && browserHostname !== "localhost" && browserHostname !== "127.0.0.1") {
+      const isVirtualOrLocal = 
+        parsed.hostname === "localhost" || 
+        parsed.hostname === "127.0.0.1" || 
+        parsed.hostname.startsWith("192.168.137.") ||
+        parsed.hostname.startsWith("192.168.56.");
+        
+      if (isVirtualOrLocal) {
+        parsed.hostname = browserHostname;
+      }
+    }
+    return parsed.toString().replace(/\/$/, "");
+  } catch {
+    return envUrl;
+  }
+}
+
+export function getWebSocketUrl(token: string): string {
+  if (typeof window === "undefined") {
+    return `ws://127.0.0.1:8000/api/v1/chat/ws/${token}`;
+  }
+
+  const browserHostname = window.location.hostname;
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  let wsProto = window.location.protocol === "https:" ? "wss" : "ws";
+  let wsHost = `${browserHostname}:8000`;
+
+  if (envUrl) {
+    try {
+      const parsed = new URL(envUrl);
+      wsProto = parsed.protocol === "https:" ? "wss" : "ws";
+      let hostname = parsed.hostname;
+      
+      if (browserHostname && browserHostname !== "localhost" && browserHostname !== "127.0.0.1") {
+        const isVirtualOrLocal = 
+          hostname === "localhost" || 
+          hostname === "127.0.0.1" || 
+          hostname.startsWith("192.168.137.") ||
+          hostname.startsWith("192.168.56.");
+          
+        if (isVirtualOrLocal) {
+          hostname = browserHostname;
+        }
+      }
+      wsHost = parsed.port ? `${hostname}:${parsed.port}` : hostname;
+    } catch {}
+  }
+
+  return `${wsProto}://${wsHost}/api/v1/chat/ws/${token}`;
+}
+
 export function getMediaUrl(url: string | undefined | null): string {
   if (!url) return "/placeholder.jpg";
   if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
     return url;
   }
-  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000/api/v1";
+  const apiBase = getApiBaseUrl();
   const host = apiBase.replace("/api/v1", "");
   const path = url.startsWith("/") ? url : `/${url}`;
   return `${host}${path}`;

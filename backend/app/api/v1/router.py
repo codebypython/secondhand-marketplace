@@ -12,6 +12,7 @@ from app.api.v1.endpoints import (
     notifications,
     media,
     map_legends,
+    livestream,
 )
 
 api_router = APIRouter()
@@ -26,4 +27,5 @@ api_router.include_router(moderation.router, prefix="/moderation", tags=["modera
 api_router.include_router(notifications.router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(social.router, tags=["social"])
 api_router.include_router(media.router, prefix="/media", tags=["media"])
+api_router.include_router(livestream.router, prefix="/livestream", tags=["livestream"])
 

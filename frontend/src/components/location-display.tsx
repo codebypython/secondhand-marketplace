@@ -1,28 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import "leaflet/dist/leaflet.css";
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import type { MapLegend } from "@/lib/types";
 
-const MapContainer = dynamic(() => import("react-leaflet").then((mod) => mod.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import("react-leaflet").then((mod) => mod.TileLayer), { ssr: false });
-const Marker = dynamic(() => import("react-leaflet").then((mod) => mod.Marker), { ssr: false });
-const Popup = dynamic(() => import("react-leaflet").then((mod) => mod.Popup), { ssr: false });
-const Tooltip = dynamic(() => import("react-leaflet").then((mod) => mod.Tooltip), { ssr: false });
-
-const initLeafletIcon = async () => {
-  if (typeof window === "undefined") return;
-  const L = await import("leaflet");
-  // @ts-expect-error - Leaflet types might not include private properties
-  delete L.Icon.Default.prototype._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  });
-};
+// Dynamically import the map component, disabling SSR
+const LocationDisplayMap = dynamic(() => import("./location-display-map"), { ssr: false });
 
 interface LocationDisplayProps {
   location: any;
@@ -31,20 +15,16 @@ interface LocationDisplayProps {
 export function LocationDisplay({ location }: LocationDisplayProps) {
   const [mounted, setMounted] = useState(false);
   const [legends, setLegends] = useState<MapLegend[]>([]);
-  const [customIcon, setCustomIcon] = useState<any>(null);
   const [showLegendPanel, setShowLegendPanel] = useState(false);
 
   useEffect(() => {
     const init = async () => {
-      await initLeafletIcon();
-      
       try {
         const data = await api.listMapLegends();
         setLegends(data);
       } catch (err) {
         console.error("Failed to load map legends in display:", err);
       }
-      
       setMounted(true);
     };
     void init();
@@ -75,48 +55,6 @@ export function LocationDisplay({ location }: LocationDisplayProps) {
     }
   }
 
-  // Generate custom icon dynamically when legends and symbol_type are loaded
-  useEffect(() => {
-    if (!mounted || !lat || !lng) return;
-    const updateIcon = async () => {
-      try {
-        const L = await import("leaflet");
-        const legend = legends.find(l => l.symbol_type === symbol_type) || {
-          icon: "📍",
-          color: "#6366f1"
-        };
-        
-        const icon = L.divIcon({
-          html: `
-            <div style="
-              background-color: ${legend.color};
-              color: white;
-              width: 32px;
-              height: 32px;
-              border-radius: 50%;
-              border: 2px solid white;
-              box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 16px;
-            ">
-              ${legend.icon}
-            </div>
-          `,
-          className: "custom-leaflet-marker",
-          iconSize: [32, 32],
-          iconAnchor: [16, 32],
-          popupAnchor: [0, -32]
-        });
-        setCustomIcon(icon);
-      } catch (err) {
-        console.error("Error setting display icon:", err);
-      }
-    };
-    void updateIcon();
-  }, [symbol_type, legends, mounted, lat, lng]);
-
   if (!location || isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) return null;
 
   if (!mounted) {
@@ -138,29 +76,14 @@ export function LocationDisplay({ location }: LocationDisplayProps) {
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {/* Map Container */}
       <div style={{ height: 260, borderRadius: "var(--radius)", overflow: "hidden", border: "1px solid var(--border)", position: "relative" }}>
-        <MapContainer center={{ lat, lng }} zoom={15} style={{ height: "100%", width: "100%" }} scrollWheelZoom={false}>
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <Marker position={{ lat, lng }} icon={customIcon || undefined}>
-            <Popup>
-              <div style={{ padding: "4px", fontSize: "13px", maxWidth: 220 }}>
-                <strong style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 4 }}>
-                  <span>{activeLegend.icon}</span> 
-                  <span>{activeLegend.name}</span>
-                </strong>
-                <p style={{ margin: "4px 0 6px 0", color: "var(--text)", fontWeight: 500 }}>📍 {address}</p>
-                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 4, fontSize: "11px", color: "var(--text-secondary)", fontStyle: "italic" }}>
-                  {activeLegend.description}
-                </div>
-              </div>
-            </Popup>
-            <Tooltip permanent direction="top" offset={[0, -32]}>
-              <span style={{ fontSize: "11px", fontWeight: "bold" }}>{activeLegend.icon} {address}</span>
-            </Tooltip>
-          </Marker>
-        </MapContainer>
+        <LocationDisplayMap
+          lat={lat}
+          lng={lng}
+          address={address}
+          symbol_type={symbol_type}
+          legends={legends}
+          activeLegend={activeLegend}
+        />
       </div>
 
       {/* Location Details and Legend Trigger */}

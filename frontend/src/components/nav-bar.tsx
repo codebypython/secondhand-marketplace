@@ -96,16 +96,17 @@ export function NavBar() {
   };
 
   const links = [
-    { href: "/", label: "Home" },
-    { href: "/listings/new", label: "Create listing" },
-    { href: "/dashboard/offers", label: "Transactions" },
+    { href: "/", label: "Trang chủ" },
+    { href: "/livestream", label: "Livestream" },
+    { href: "/listings/new", label: "Đăng tin mới" },
+    { href: "/dashboard/offers", label: "Giao dịch" },
     { 
       href: "/inbox", 
-      label: unreadMessagesCount > 0 ? `Inbox (${unreadMessagesCount})` : "Inbox",
+      label: unreadMessagesCount > 0 ? `Tin nhắn (${unreadMessagesCount})` : "Tin nhắn",
       badge: unreadMessagesCount > 0
     },
-    ...(user?.role === "ADMIN" ? [{ href: "/moderation", label: "Moderation" }] : []),
-    { href: "/profile", label: "Profile" },
+    ...(user?.role === "ADMIN" ? [{ href: "/moderation", label: "Kiểm duyệt" }] : []),
+    { href: "/profile", label: "Cá nhân" },
   ];
 
   const initials = user?.profile?.full_name
@@ -363,8 +364,8 @@ export function NavBar() {
           </>
         ) : (
           <>
-            <Link className="button ghost sm" href="/login">Sign in</Link>
-            <Link className="button primary sm" href="/register">Register</Link>
+            <Link className="button ghost sm" href="/login">Đăng nhập</Link>
+            <Link className="button primary sm" href="/register">Đăng ký</Link>
           </>
         )}
       </div>

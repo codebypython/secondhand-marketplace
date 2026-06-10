@@ -134,6 +134,16 @@ export function ProductBrowserContent() {
     radius_km: nearMe && userCoords ? radiusKm : undefined,
   });
 
+  const mapZoom = useMemo(() => {
+    if (!nearMe) return 13;
+    if (radiusKm === 2) return 14;
+    if (radiusKm === 5) return 13;
+    if (radiusKm === 10) return 12;
+    if (radiusKm === 25) return 10;
+    if (radiusKm === 50) return 9;
+    return 13;
+  }, [radiusKm, nearMe]);
+
   // Pre-process categories into hierarchical list for the filter dropdown
   const categoriesDropdownList = useMemo(() => {
     const list: { id: string; name: string; isChild: boolean }[] = [];
@@ -282,6 +292,7 @@ export function ProductBrowserContent() {
             <div className={styles.mapContainer}>
               <LocationPicker
                 value={userCoords ? { lat: userCoords.lat, lng: userCoords.lng, address: locationLabel } : null}
+                zoom={mapZoom}
                 onChange={async (loc) => {
                   setUserCoords({ lat: loc.lat, lng: loc.lng });
                   setLocationMethod("map");

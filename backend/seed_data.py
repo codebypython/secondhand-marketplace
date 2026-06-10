@@ -299,7 +299,30 @@ def seed():
                 local_images[cat_name].append(local_url)
         print("  [SUCCESS] Mock images ready.")
 
-        # --- Users ---
+        # --- Users & Live Rooms ---
+        LIVE_ROOM_SEEDS = {
+            "namhai13245768@gmail.com": {
+                "title": "Nam Hải Mobile & Laptop - Xả kho Điện thoại, Laptop cũ giá cực tốt",
+                "preview_url": "https://images.unsplash.com/photo-1588702547884-7803aba28626?auto=format&fit=crop&w=600&q=80",
+                "tags": "Điện tử,Laptop,Điện thoại"
+            },
+            "kienkaiser102@gmail.com": {
+                "title": "Kiên Kaiser Vintage - Máy ảnh & Ống kính cổ điển chất lượng",
+                "preview_url": "https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=600&q=80",
+                "tags": "Nhiếp ảnh,Máy ảnh"
+            },
+            "nguyenkientrung252@gmail.com": {
+                "title": "Góc Sách & Đồ Gia Dụng Thanh Lý Học Sinh Sinh Viên",
+                "preview_url": "https://images.unsplash.com/photo-1524758631624-e2822e304c36?auto=format&fit=crop&w=600&q=80",
+                "tags": "Sách,Thời trang,Gia dụng"
+            },
+            "kien1152005@gmail.com": {
+                "title": "Phòng live hỗ trợ kiểm duyệt tin đăng và giải đáp thắc mắc",
+                "preview_url": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=600&q=80",
+                "tags": "Kiểm duyệt,Hỗ trợ"
+            }
+        }
+
         pwd = hash_password("Password123!")
         users = []
         now = datetime.now(UTC)
@@ -323,9 +346,27 @@ def seed():
                 updated_at=created,
             )
             session.add(profile)
+
+            from app.models.livestream import LiveRoom
+            room_seed = LIVE_ROOM_SEEDS.get(u["email"], {
+                "title": f"Phòng livestream của {u['full_name']}",
+                "preview_url": "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=600&q=80",
+                "tags": "Chợ Đồ Cũ"
+            })
+            live_room = LiveRoom(
+                user_id=str(user.id),
+                title=room_seed["title"],
+                preview_url=room_seed["preview_url"],
+                tags=room_seed["tags"],
+                is_live=False,
+                is_online=False,
+                created_at=created,
+                updated_at=created
+            )
+            session.add(live_room)
             users.append(user)
         session.flush()
-        print(f"  [SUCCESS] Created {len(users)} real users (Default password: Password123!)")
+        print(f"  [SUCCESS] Created {len(users)} real users & live rooms (Default password: Password123!)")
 
         # --- Listings ---
         listings = []

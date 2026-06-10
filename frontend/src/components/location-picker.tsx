@@ -1,89 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import "leaflet/dist/leaflet.css";
-
-// We need to dynamically import leaflet components to avoid SSR errors
 import dynamic from "next/dynamic";
 import { api } from "@/lib/api";
 import type { MapLegend } from "@/lib/types";
 
-const MapContainer = dynamic(() => import("react-leaflet").then((mod) => mod.MapContainer), { ssr: false });
-const TileLayer = dynamic(() => import("react-leaflet").then((mod) => mod.TileLayer), { ssr: false });
-const Marker = dynamic(() => import("react-leaflet").then((mod) => mod.Marker), { ssr: false });
-
-// Fix leaflet default icon issue in Next.js
-const initLeafletIcon = async () => {
-  if (typeof window === "undefined") return;
-  const L = await import("leaflet");
-  // @ts-expect-error - Leaflet types might not include private properties
-  delete L.Icon.Default.prototype._getIconUrl;
-  L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-    iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-  });
-};
+// Dynamic import of the map component, disabling SSR
+const LocationPickerMap = dynamic(() => import("./location-picker-map"), { ssr: false });
 
 interface LocationPickerProps {
   value: { lat: number; lng: number; address?: string; symbol_type?: string } | null;
   onChange: (location: { lat: number; lng: number; address?: string; symbol_type?: string }) => void;
+  zoom?: number;
 }
 
-// Helper component to programmatically pan map view when coordinates change
-function ChangeMapCenter({ center }: { center: { lat: number; lng: number } }) {
-  const { useMap } = require("react-leaflet");
-  const map = useMap();
-  useEffect(() => {
-    map.setView([center.lat, center.lng], map.getZoom());
-  }, [center, map]);
-  return null;
-}
-
-// We extract MapEvents to a separate component to use hooks properly
-function MapEventsHandler({ 
-  onChange, 
-  currentSymbolType,
-  onAddressFetchStart,
-  onAddressFetchEnd
-}: { 
-  onChange: (loc: { lat: number; lng: number; address?: string; symbol_type: string }) => void; 
-  currentSymbolType: string;
-  onAddressFetchStart?: () => void;
-  onAddressFetchEnd?: () => void;
-}) {
-  const { useMapEvents } = require("react-leaflet");
-  
-  useMapEvents({
-    async click(e: { latlng: { lat: number; lng: number } }) {
-      if (onAddressFetchStart) onAddressFetchStart();
-      let address = "";
-      try {
-        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${e.latlng.lat}&lon=${e.latlng.lng}`, {
-          headers: { "User-Agent": "SecondhandMarketplaceApp/1.0" }
-        });
-        const data = await res.json();
-        address = data?.display_name || "";
-      } catch (err) {
-        console.error("Failed to reverse geocode click:", err);
-      }
-      onChange({ lat: e.latlng.lat, lng: e.latlng.lng, address, symbol_type: currentSymbolType });
-      if (onAddressFetchEnd) onAddressFetchEnd();
-    },
-  });
-  return null;
-}
-
-export function LocationPicker({ value, onChange }: LocationPickerProps) {
+export function LocationPicker({ value, onChange, zoom = 13 }: LocationPickerProps) {
   const [mounted, setMounted] = useState(false);
   const [legends, setLegends] = useState<MapLegend[]>([]);
-  const [customIcon, setCustomIcon] = useState<any>(null);
   const [locating, setLocating] = useState(false);
   const [addressLoading, setAddressLoading] = useState(false);
   const defaultCenter = { lat: 16.0748, lng: 108.1532 }; // Danang University of Technology (DUT)
 
   useEffect(() => {
-    void initLeafletIcon();
     setMounted(true);
     void api.listMapLegends().then((data) => {
       setLegends(data);
@@ -135,49 +73,6 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       }
     }
   }, []);
-
-  // Update custom icon dynamically when symbol_type changes
-  useEffect(() => {
-    if (!mounted) return;
-    const updateIcon = async () => {
-      try {
-        const L = await import("leaflet");
-        const currentSymbol = value?.symbol_type || "STANDARD";
-        const legend = legends.find(l => l.symbol_type === currentSymbol) || {
-          icon: "📍",
-          color: "#6366f1"
-        };
-
-        const icon = L.divIcon({
-          html: `
-            <div style="
-               background-color: ${legend.color};
-               color: white;
-               width: 32px;
-               height: 32px;
-               border-radius: 50%;
-               border: 2px solid white;
-               box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-               display: flex;
-               align-items: center;
-               justify-content: center;
-               font-size: 16px;
-             ">
-               ${legend.icon}
-             </div>
-           `,
-          className: "custom-leaflet-marker",
-          iconSize: [32, 32],
-          iconAnchor: [16, 32],
-          popupAnchor: [0, -32]
-        });
-        setCustomIcon(icon);
-      } catch (err) {
-        console.error("Error setting custom map icon:", err);
-      }
-    };
-    void updateIcon();
-  }, [value?.symbol_type, legends, mounted]);
 
   const currentSymbolType = value?.symbol_type || "STANDARD";
 
@@ -314,20 +209,15 @@ export function LocationPicker({ value, onChange }: LocationPickerProps) {
       </div>
 
       <div style={{ height: 300, borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid var(--border)" }}>
-        <MapContainer center={center} zoom={13} style={{ height: "100%", width: "100%" }}>
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <ChangeMapCenter center={center} />
-          {value && <Marker position={{ lat: value.lat, lng: value.lng }} icon={customIcon || undefined} />}
-          <MapEventsHandler 
-            onChange={onChange} 
-            currentSymbolType={currentSymbolType}
-            onAddressFetchStart={() => setAddressLoading(true)}
-            onAddressFetchEnd={() => setAddressLoading(false)}
-          />
-        </MapContainer>
+        <LocationPickerMap
+          center={center}
+          zoom={zoom}
+          value={value}
+          onChange={onChange}
+          currentSymbolType={currentSymbolType}
+          legends={legends}
+          setAddressLoading={setAddressLoading}
+        />
       </div>
 
       {addressLoading && (

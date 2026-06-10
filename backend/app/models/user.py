@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.models.transaction import Deal, Offer
     from app.models.notification import Notification
     from app.models.audit import ActivityLog
+    from app.models.livestream import LiveRoom
 
 
 class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
@@ -40,6 +41,11 @@ class User(Base, UUIDMixin, TimestampMixin, SoftDeleteMixin):
     reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     profile: Mapped[Profile | None] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+    live_room: Mapped[LiveRoom | None] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,

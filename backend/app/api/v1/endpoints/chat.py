@@ -108,8 +108,9 @@ class ConnectionManager:
         await websocket.accept()
         self.active_connections[user_id] = websocket
 
-    def disconnect(self, user_id: str):
-        self.active_connections.pop(user_id, None)
+    def disconnect(self, user_id: str, websocket: WebSocket):
+        if self.active_connections.get(user_id) == websocket:
+            self.active_connections.pop(user_id, None)
 
     async def send_personal_message(self, message: dict, user_id: str):
         websocket = self.active_connections.get(user_id)
@@ -117,16 +118,44 @@ class ConnectionManager:
             try:
                 await websocket.send_json(message)
             except Exception:
-                self.disconnect(user_id)
+                self.disconnect(user_id, websocket)
 
     async def broadcast(self, message: dict):
         for user_id, websocket in list(self.active_connections.items()):
             try:
                 await websocket.send_json(message)
             except Exception:
-                self.disconnect(user_id)
+                self.disconnect(user_id, websocket)
 
 manager = ConnectionManager()
+
+
+async def handle_disconnect_with_grace(user_id_str: str, user_id_uuid: UUID):
+    from app.db.session import SessionFactory
+    import asyncio
+    # Wait for 15 seconds (grace period for page navigation or reload)
+    await asyncio.sleep(15)
+    
+    if user_id_str in manager.active_connections:
+        print(f"[Livestream] Streamer {user_id_str} reconnected within grace period. Keeping stream active.")
+        return
+        
+    print(f"[Livestream] Streamer {user_id_str} did not reconnect. Setting is_live=False.")
+    try:
+        from app.models.livestream import LiveRoom
+        with SessionFactory() as session:
+            room = session.get(LiveRoom, user_id_uuid)
+            if room:
+                room.is_live = False
+                room.is_online = False
+                session.commit()
+    except Exception as e:
+        print("Failed to turn off live status on disconnect after grace period:", e)
+
+    await manager.broadcast({
+        "type": "stream_inactive",
+        "broadcaster_id": user_id_str
+    })
 
 
 @router.websocket("/ws/{token}")
@@ -147,6 +176,17 @@ async def websocket_endpoint(websocket: WebSocket, token: str) -> None:
         return
 
     await manager.connect(websocket, str(user_id))
+    
+    # Update LiveRoom online status
+    try:
+        from app.models.livestream import LiveRoom
+        with SessionFactory() as session:
+            room = session.get(LiveRoom, user_id)
+            if room:
+                room.is_online = True
+                session.commit()
+    except Exception as e:
+        print("Failed to set LiveRoom is_online=True on connect:", e)
     
     try:
         while True:
@@ -242,12 +282,31 @@ async def websocket_endpoint(websocket: WebSocket, token: str) -> None:
                 }
                 await manager.send_personal_message(forward_payload, target_user_id)
 
-            elif msg_type in ("stream_start", "stream_join", "stream_leave", "stream_offer", "stream_answer", "stream_ice"):
+            elif msg_type in ("stream_start", "stream_join", "stream_leave", "stream_offer", "stream_answer", "stream_ice", "live_comment", "live_heart", "live_viewer_count"):
                 listing_id = message_data.get("listing_id")
                 if not listing_id:
                     continue
                 
-                if msg_type == "stream_start":
+                if msg_type in ("live_comment", "live_heart", "live_viewer_count"):
+                    await manager.broadcast({
+                        "type": msg_type,
+                        "listing_id": listing_id,
+                        "sender_id": str(user_id),
+                        **{k: v for k, v in message_data.items() if k not in ("type", "listing_id")}
+                    })
+                elif msg_type == "stream_start":
+                    try:
+                        from app.models.livestream import LiveRoom
+                        with SessionFactory() as session:
+                            room = session.get(LiveRoom, user_id)
+                            if room:
+                                room.is_live = True
+                                room.is_online = True
+                                session.commit()
+                                print(f"[Livestream] Streamer {user_id} started stream. Set is_live=True in DB.")
+                    except Exception as e:
+                        print("Failed to set is_live=True on stream_start:", e)
+
                     await manager.broadcast({
                         "type": "stream_active",
                         "listing_id": listing_id,
@@ -282,9 +341,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        manager.disconnect(str(user_id))
-        await manager.broadcast({
-            "type": "stream_inactive",
-            "broadcaster_id": str(user_id)
-        })
+        manager.disconnect(str(user_id), websocket)
+        import asyncio
+        asyncio.create_task(handle_disconnect_with_grace(str(user_id), user_id))
 

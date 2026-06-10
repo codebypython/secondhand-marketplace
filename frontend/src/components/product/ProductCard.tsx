@@ -1,6 +1,7 @@
 import React from 'react';
 import { Listing } from '@/lib/types';
 import Badge from '@/components/ui/Badge';
+import WishlistButton from './WishlistButton';
 import styles from './ProductCard.module.css';
 
 const conditionLabels: Record<string, string> = {
@@ -43,6 +44,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({ listing, onClick }) =>
           className={styles.image}
           onError={(e) => {
             (e.target as HTMLImageElement).src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Crect fill=%22%23333%22 width=%22100%22 height=%22100%22/%3E%3Ctext x=%2250%22 y=%2250%22 text-anchor=%22middle%22 dy=%22.3em%22 fill=%22%23999%22 font-size=%2212%22%3ENo Image%3C/text%3E%3C/svg%3E';
+          }}
+        />
+        <WishlistButton
+          listingId={listing.id}
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            zIndex: 10,
           }}
         />
         <div className={styles.badges}>

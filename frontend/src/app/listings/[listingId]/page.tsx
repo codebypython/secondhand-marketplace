@@ -12,6 +12,7 @@ import type { Listing } from "@/lib/types";
 import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
 import { LocationDisplay } from "@/components/location-display";
 import { Video, Tv, X } from "lucide-react";
+import WishlistButton from "@/components/product/WishlistButton";
 import styles from "@/components/product/ProductDetail.module.css";
 
 export default function ListingDetailPage() {
@@ -25,15 +26,11 @@ export default function ListingDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [reportReason, setReportReason] = useState("");
-  const [favorited, setFavorited] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [questions, setQuestions] = useState<any[]>([]);
   const [newQuestion, setNewQuestion] = useState("");
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
-  const [wishlists, setWishlists] = useState<any[]>([]);
-  const [showWishlistSelector, setShowWishlistSelector] = useState(false);
-  const [newWishlistName, setNewWishlistName] = useState("");
 
   // Livestream states & refs
   const [streamActive, setStreamActive] = useState(false);
@@ -318,13 +315,7 @@ export default function ListingDetailPage() {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (token) {
-      api.getWishlists(token).then((data) => {
-        if (Array.isArray(data)) setWishlists(data);
-      }).catch(() => {});
-    }
-  }, [token]);
+
 
   useEffect(() => {
     let active = true;
@@ -379,15 +370,6 @@ export default function ListingDetailPage() {
     }
   };
 
-  const handleFavorite = async () => {
-    if (!token || !listing) return;
-    try {
-      const result = await api.toggleFavorite(token, listing.id);
-      setFavorited(result.favorite);
-      showToast(result.favorite ? "Đã thêm vào yêu thích ❤️" : "Đã bỏ yêu thích", "success");
-    } catch (err) { showToast(err instanceof Error ? err.message : "Lỗi", "danger"); }
-  };
-
   const handleOffer = async () => {
     if (!token || !listing || !offerPrice) return;
     setActionLoading(true);
@@ -438,31 +420,7 @@ export default function ListingDetailPage() {
     }
   };
 
-  const handleAddToWishlist = async (wishlistId: string) => {
-    if (!token) return showToast("Vui lòng đăng nhập để lưu sản phẩm", "default");
-    try {
-      await api.addWishlistItem(token, wishlistId, params.listingId);
-      showToast("Đã thêm sản phẩm vào danh sách ước!", "success");
-      setShowWishlistSelector(false);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Không thể thêm vào wishlist", "danger");
-    }
-  };
 
-  const handleCreateAndAddWishlist = async () => {
-    if (!token) return showToast("Vui lòng đăng nhập", "default");
-    if (!newWishlistName.trim()) return;
-    try {
-      const wishlist = await api.createWishlist(token, { name: newWishlistName });
-      await api.addWishlistItem(token, wishlist.id, params.listingId);
-      showToast(`Đã tạo Wishlist "${newWishlistName}" và thêm sản phẩm!`, "success");
-      setWishlists([...wishlists, wishlist]);
-      setNewWishlistName("");
-      setShowWishlistSelector(false);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Có lỗi xảy ra", "danger");
-    }
-  };
 
   const handleShare = () => {
     const url = window.location.href;
@@ -577,12 +535,7 @@ export default function ListingDetailPage() {
             <div className="divider" />
 
             <div className={styles.actionRow}>
-              <button className="button secondary sm" type="button" onClick={handleFavorite}>
-                {favorited ? "❤️ Đã thích" : "🤍 Yêu thích"}
-              </button>
-              <button className="button secondary sm" type="button" onClick={() => setShowWishlistSelector(!showWishlistSelector)}>
-                ⭐ Wishlist
-              </button>
+              <WishlistButton listingId={listing.id} iconSize={16} variant="text" />
               <button className="button ghost sm" type="button" onClick={handleShare}>📤 Chia sẻ</button>
               {!isOwner ? (
                 <button className="button ghost sm" type="button" onClick={handleConversation} disabled={actionLoading}>
@@ -590,36 +543,6 @@ export default function ListingDetailPage() {
                 </button>
               ) : null}
             </div>
-
-            {showWishlistSelector && (
-              <div className={`${styles.detailPanel} glass-panel`} style={{ marginTop: 10, background: "var(--bg-inset)", display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: "var(--radius)" }}>
-                <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Chọn danh sách ước (Wishlist)</h4>
-                {wishlists.length > 0 ? (
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {wishlists.map(w => (
-                      <button key={w.id} type="button" className="button secondary sm" onClick={() => handleAddToWishlist(w.id)}>
-                        📁 {w.name}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="muted" style={{ fontSize: 12, margin: 0 }}>Bạn chưa có danh sách ước nào.</p>
-                )}
-                
-                <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
-                  <input 
-                    placeholder="Tên danh sách ước mới..." 
-                    value={newWishlistName} 
-                    onChange={e => setNewWishlistName(e.target.value)}
-                    style={{ flex: 1, padding: "6px 10px", fontSize: 12, borderRadius: "var(--radius-sm)", border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text)" }}
-                  />
-                  <button type="button" className="button primary sm" onClick={handleCreateAndAddWishlist} disabled={!newWishlistName.trim()}>
-                    Tạo & Lưu
-                  </button>
-                  <button type="button" className="button ghost sm" onClick={() => setShowWishlistSelector(false)}>Hủy</button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Q&A Section */}

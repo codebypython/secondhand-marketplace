@@ -603,7 +603,7 @@ export default function InboxPage() {
                       </div>
                       {lastMessage ? (
                         <div className="truncate" style={{ fontSize: 12, color: unread ? "var(--text)" : "var(--text-tertiary)", fontWeight: unread ? 500 : 400 }}>
-                          {lastMessage.sender_id === user?.id ? "Bạn: " : ""}{lastMessage.content}
+                          {lastMessage.sender_id === user?.id ? "Bạn: " : ""}{lastMessage.content.startsWith("![IMAGE]") ? "[Hình ảnh]" : lastMessage.content}
                         </div>
                       ) : (
                         <div className="muted" style={{ fontSize: 12 }}>Chưa có tin nhắn</div>
@@ -829,7 +829,7 @@ export default function InboxPage() {
                       fontSize: 22, fontWeight: 700, overflow: "hidden"
                     }}>
                       {partner.profile?.avatar_url ? (
-                        <img src={partner.profile.avatar_url} alt="Partner avatar" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+                        <img src={partner.profile.avatar_url} alt="Ảnh đại diện đối tác" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
                       ) : initials}
                     </div>
                     <div>

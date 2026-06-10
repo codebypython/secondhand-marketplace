@@ -9,6 +9,7 @@ from app.models.user import Profile, User
 from app.models.notification import Notification
 from app.models.audit import ActivityLog
 from app.models.mock_email import MockEmail
+from app.models.livestream import LiveRoom, LiveComment
 
 __all__ = [
     "Block",
@@ -31,6 +32,8 @@ __all__ = [
     "Notification",
     "ActivityLog",
     "MockEmail",
+    "LiveRoom",
+    "LiveComment",
     "conversation_participant",
     "message_deleted_for",
     "user_favorite_listing",

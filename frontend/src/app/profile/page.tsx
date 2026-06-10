@@ -151,6 +151,86 @@ export default function ProfilePage() {
       </PageShell>
     );
   }
+  // Livestream states
+  const [liveRoom, setLiveRoom] = useState<any>(null);
+  const [isLiveEnabled, setIsLiveEnabled] = useState(false);
+  const [showLiveModal, setShowLiveModal] = useState(false);
+  const [liveTitle, setLiveTitle] = useState("");
+  const [liveTags, setLiveTags] = useState("");
+  const [livePreviewUrl, setLivePreviewUrl] = useState("");
+  const [liveLoading, setLiveLoading] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    api.getMyLiveRoom(token)
+      .then((room) => {
+        setLiveRoom(room);
+        setIsLiveEnabled(room?.is_live ?? false);
+        setLiveTitle(room?.title ?? "");
+        setLiveTags(room?.tags ?? "");
+        setLivePreviewUrl(room?.preview_url ?? "");
+      })
+      .catch((err) => {
+        console.error("Failed to load live room:", err);
+      });
+  }, [token]);
+
+  const handleLiveToggle = async (checked: boolean) => {
+    if (!token) return;
+    
+    if (checked) {
+      const defaultTitle = `Phòng live của ${user?.profile?.full_name ?? user?.email}`;
+      if (!liveRoom || !liveRoom.title || liveRoom.title === defaultTitle || liveRoom.title === "Phòng trực tiếp") {
+        setShowLiveModal(true);
+      } else {
+        setLiveLoading(true);
+        try {
+          const updated = await api.updateMyLiveRoom(token, { is_live: true });
+          setLiveRoom(updated);
+          setIsLiveEnabled(true);
+          showToast("Đã bật phát trực tiếp!", "success");
+        } catch (err) {
+          showToast(err instanceof Error ? err.message : "Lỗi khi bật phát trực tiếp", "danger");
+        } finally {
+          setLiveLoading(false);
+        }
+      }
+    } else {
+      setLiveLoading(true);
+      try {
+        const updated = await api.updateMyLiveRoom(token, { is_live: false });
+        setLiveRoom(updated);
+        setIsLiveEnabled(false);
+        showToast("Đã tắt phát trực tiếp.", "default");
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Lỗi khi tắt phát trực tiếp", "danger");
+      } finally {
+        setLiveLoading(false);
+      }
+    }
+  };
+
+  const handleSaveLiveRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+    setLiveLoading(true);
+    try {
+      const updated = await api.updateMyLiveRoom(token, {
+        title: liveTitle,
+        tags: liveTags,
+        preview_url: livePreviewUrl || undefined,
+        is_live: true
+      });
+      setLiveRoom(updated);
+      setIsLiveEnabled(true);
+      setShowLiveModal(false);
+      showToast("Cấu hình livestream thành công và đã bắt đầu phát trực tiếp!", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Lỗi khi lưu cấu hình livestream", "danger");
+    } finally {
+      setLiveLoading(false);
+    }
+  };
 
   const initials = getInitials(user.profile?.full_name, user.email[0].toUpperCase());
   const activeListings = myListings.filter((l) => l.status === "AVAILABLE");
@@ -247,6 +327,62 @@ export default function ProfilePage() {
               <Trash2 size={16} />
               Thùng rác (Tin đã xóa)
             </Link>
+          </div>
+
+          {/* Livestream Management Panel */}
+          <div className="glass-panel" style={{ display: "flex", flexDirection: "column", gap: 16, padding: 24, borderRadius: "var(--radius-lg)" }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              📺 Quản lý Livestream P2P
+            </h3>
+            <p className="muted" style={{ fontSize: 13, lineHeight: 1.5 }}>
+              Bật phòng phát trực tiếp để người dùng khác có thể xem và tương tác với các sản phẩm của bạn qua WebRTC.
+            </p>
+            
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", background: "var(--bg-inset)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontWeight: 600, fontSize: 14 }}>Trạng thái phòng phát</span>
+                <span className="muted" style={{ fontSize: 12 }}>
+                  {isLiveEnabled ? "🔴 Đang phát sóng" : "⚪ Đang ngoại tuyến"}
+                </span>
+              </div>
+              
+              <label className="switch-toggle" style={{ position: "relative", display: "inline-block", width: 50, height: 26 }}>
+                <input 
+                  type="checkbox" 
+                  checked={isLiveEnabled}
+                  onChange={(e) => handleLiveToggle(e.target.checked)}
+                  disabled={liveLoading}
+                  style={{ opacity: 0, width: 0, height: 0 }}
+                />
+                <span style={{
+                  position: "absolute", cursor: "pointer", top: 0, left: 0, right: 0, bottom: 0,
+                  backgroundColor: isLiveEnabled ? "var(--success)" : "#ccc",
+                  transition: ".4s", borderRadius: 34,
+                  opacity: liveLoading ? 0.6 : 1
+                }}>
+                  <span style={{
+                    position: "absolute", content: '""', height: 18, width: 18, left: 4, bottom: 4,
+                    backgroundColor: "white", transition: ".4s", borderRadius: "50%",
+                    transform: isLiveEnabled ? "translateX(24px)" : "translateX(0)"
+                  }} />
+                </span>
+              </label>
+            </div>
+
+            {isLiveEnabled ? (
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                <Link className="button primary sm" style={{ flex: 1, textAlign: "center" }} href={`/livestream/${user?.id}`}>
+                  📹 Vào phòng phát sóng
+                </Link>
+                <button className="button secondary sm" type="button" onClick={() => setShowLiveModal(true)}>
+                  ⚙️ Cấu hình phòng
+                </button>
+              </div>
+            ) : (
+              <button className="button secondary sm" type="button" onClick={() => setShowLiveModal(true)}>
+                ⚙️ Thiết lập thông tin
+              </button>
+            )}
           </div>
 
           {/* Edit form */}
@@ -478,6 +614,59 @@ export default function ProfilePage() {
         onClose={() => setCropperOpen(false)}
         onCrop={handleCropComplete}
       />
+
+      {showLiveModal && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(4px)",
+          zIndex: 10001, display: "flex", alignItems: "center", justifyContent: "center", padding: 20
+        }}>
+          <div className="card" style={{ width: "100%", maxWidth: 500, background: "var(--bg-card)", margin: 0, border: "1px solid var(--border)", padding: 24, borderRadius: "var(--radius-lg)" }}>
+            <h2 className="card-title" style={{ borderLeftColor: "var(--accent)" }}>
+              ⚙️ Cấu Hình Phòng Livestream
+            </h2>
+            <form onSubmit={handleSaveLiveRoom} style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 14 }}>
+              <div className="field">
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Tiêu đề Livestream <span style={{ color: "red" }}>*</span></label>
+                <input 
+                  placeholder="Ví dụ: Thanh lý đồ dùng gia đình siêu rẻ..." 
+                  value={liveTitle} 
+                  onChange={(e) => setLiveTitle(e.target.value)} 
+                  required
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text)" }}
+                />
+              </div>
+              <div className="field">
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Thẻ Tags phân loại</label>
+                <input 
+                  placeholder="Ví dụ: dien-tu, gia-dung, thanh-ly (ngăn cách bằng dấu phẩy)" 
+                  value={liveTags} 
+                  onChange={(e) => setLiveTags(e.target.value)} 
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text)" }}
+                />
+              </div>
+              <div className="field">
+                <label style={{ fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 }}>Link ảnh xem trước (Preview Image URL)</label>
+                <input 
+                  placeholder="Ví dụ: https://images.unsplash.com/... hoặc để trống" 
+                  value={livePreviewUrl} 
+                  onChange={(e) => setLivePreviewUrl(e.target.value)} 
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "var(--radius)", border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text)" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 10 }}>
+                <button className="button secondary" type="button" onClick={() => setShowLiveModal(false)} disabled={liveLoading}>
+                  Hủy
+                </button>
+                <button className="button primary" type="submit" disabled={liveLoading}>
+                  {liveLoading ? "Đang xử lý..." : "Lưu & Bắt đầu Live"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </PageShell>
   );
 }

@@ -228,7 +228,21 @@ export const api = {
       throw new ApiError(data.detail ?? "Upload failed", response.status);
     }
     return response.json() as Promise<{ url: string }>;
-  }
+  },
+
+  // Livestreaming
+  getMyLiveRoom: (token: string) =>
+    request<any>("/livestream/rooms/me", undefined, token),
+  updateMyLiveRoom: (token: string, payload: { title?: string; preview_url?: string; tags?: string; is_live?: boolean; is_online?: boolean }) =>
+    request<any>("/livestream/rooms/me", { method: "PATCH", body: JSON.stringify(payload) }, token),
+  getActiveLiveRooms: () =>
+    request<any[]>("/livestream/rooms"),
+  getLiveRoom: (streamerId: string) =>
+    request<any>(`/livestream/rooms/${streamerId}`),
+  getLiveComments: (streamerId: string) =>
+    request<any[]>(`/livestream/rooms/${streamerId}/comments`),
+  postLiveComment: (token: string, streamerId: string, content: string) =>
+    request<any>(`/livestream/rooms/${streamerId}/comments`, { method: "POST", body: JSON.stringify({ content }) }, token)
 };
 
 

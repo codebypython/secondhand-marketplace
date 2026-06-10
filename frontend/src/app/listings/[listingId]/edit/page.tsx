@@ -31,6 +31,7 @@ export default function EditListingPage() {
   const [price, setPrice] = useState("");
   const [condition, setCondition] = useState<ItemCondition>("USED");
   const [categoryId, setCategoryId] = useState("");
+  const [selectedParentId, setSelectedParentId] = useState("");
   const [brand, setBrand] = useState("");
   const [hasWarranty, setHasWarranty] = useState(false);
   const [status, setStatus] = useState<ListingStatus>("AVAILABLE");
@@ -65,6 +66,16 @@ export default function EditListingPage() {
       setPrice(Number(item.price).toString());
       setCondition(item.condition);
       setCategoryId(item.category_id || "");
+      if (item.category_id) {
+        const cat = cats.find((c) => c.id === item.category_id);
+        if (cat) {
+          if (cat.parent_id) {
+            setSelectedParentId(cat.parent_id);
+          } else {
+            setSelectedParentId(cat.id);
+          }
+        }
+      }
       setBrand(item.brand || "");
       setHasWarranty(item.has_warranty || false);
       setStatus(item.status);
@@ -121,6 +132,9 @@ export default function EditListingPage() {
       setSaving(false);
     }
   };
+
+  const parentCategories = categories.filter((c) => !c.parent_id);
+  const filteredSubCategories = categories.filter((c) => c.parent_id && c.parent_id === selectedParentId);
 
   if (!token) {
     return (
@@ -179,11 +193,45 @@ export default function EditListingPage() {
               required
             />
           </div>
+        </div>
+
+        <div className="grid two">
           <div className="field">
-            <label htmlFor="category">Danh mục</label>
-            <select id="category" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
-              <option value="">— Chọn danh mục —</option>
-              {categories.map((c) => (
+            <label htmlFor="parent-category">Danh mục chính *</label>
+            <select
+              id="parent-category"
+              value={selectedParentId}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedParentId(val);
+                setCategoryId("");
+              }}
+              required
+            >
+              <option value="">— Chọn danh mục chính —</option>
+              {parentCategories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="field">
+            <label htmlFor="subcategory">Danh mục con *</label>
+            <select
+              id="subcategory"
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              disabled={!selectedParentId || filteredSubCategories.length === 0}
+              required
+            >
+              <option value="">
+                {!selectedParentId 
+                  ? "— Vui lòng chọn danh mục chính —" 
+                  : filteredSubCategories.length === 0 
+                  ? "— Không có danh mục con —" 
+                  : "— Chọn danh mục con —"}
+              </option>
+              {filteredSubCategories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>

@@ -70,29 +70,41 @@ def seed() -> None:
         session.commit()
 
         print("Creating categories...")
-        cat_data = [
-            ("Điện tử", "dien-tu", "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=200"),
-            ("Thời trang", "thoi-trang", "https://images.unsplash.com/photo-1445205170230-053b83016050?w=200"),
-            ("Đồ gia dụng", "do-gia-dung", "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=200"),
-            ("Sách & Giải trí", "sach-giai-tri", "https://images.unsplash.com/photo-1495446815901-a7297e633e8d?w=200"),
-            ("Xe cộ", "xe-co", "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=200"),
-        ]
-        categories = []
-        for name, slug, img in cat_data:
-            c = Category(name=name, slug=slug, image_url=img)
-            categories.append(c)
-            session.add(c)
+        import random
+        cat_data = {
+            "Điện tử": [("Điện thoại", "dien-thoai"), ("Laptop", "laptop")],
+            "Thời trang": [("Quần áo", "quan-ao"), ("Giày dép", "giay-dep")],
+            "Đồ gia dụng": [("Dụng cụ nhà bếp", "dung-cu-nha-bep")],
+            "Sách & Giải trí": [("Sách giáo khoa", "sach-giao-khoa")],
+            "Xe cộ": [("Xe máy", "xe-may"), ("Xe đạp", "xe-dap")],
+        }
+        
+        parent_categories = []
+        child_categories_map = {}
+        for name, children in cat_data.items():
+            slug = name.lower().replace(" ", "-").replace("&", "and").replace("đ", "d").replace("Đ", "d")
+            p = Category(name=name, slug=slug)
+            session.add(p)
+            session.flush()
+            parent_categories.append(p)
+            child_categories_map[p.id] = []
+            for c_name, c_slug in children:
+                c = Category(name=c_name, slug=c_slug, parent_id=p.id)
+                session.add(c)
+                session.flush()
+                child_categories_map[p.id].append(c)
         session.commit()
 
         print("Creating listings...")
         listings = []
         for i in range(30):
             seller = sellers[i % 10]
-            cat = categories[i % 5]
+            parent_cat = parent_categories[i % 5]
+            chosen_cat = random.choice(child_categories_map[parent_cat.id])
             l = Listing(
                 owner=seller,
-                category=cat,
-                title=f"Sản phẩm demo #{i+1} - {cat.name}",
+                category=chosen_cat,
+                title=f"Sản phẩm demo #{i+1} - {chosen_cat.name}",
                 description=f"Đây là mô tả chi tiết cho sản phẩm #{i+1}. Hàng còn mới, sử dụng tốt, đầy đủ phụ kiện.",
                 price=Decimal(str(100 + i * 50)),
                 condition=ItemCondition.LIKE_NEW if i % 3 == 0 else ItemCondition.USED,

@@ -1,7 +1,7 @@
 import os
 import shutil
 import uuid
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status, Request
 
 from app.api.deps import get_current_user
 from app.models.user import User
@@ -16,6 +16,7 @@ ALLOWED_EXTENSIONS = {
 
 @router.post("/upload")
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
@@ -42,5 +43,6 @@ async def upload_file(
         )
 
     # Trả về URL đầy đủ phục vụ kiểm duyệt AI và hiển thị Next.js
-    url = f"http://localhost:8000/static/uploads/{unique_filename}"
+    base_url = str(request.base_url).rstrip("/")
+    url = f"{base_url}/static/uploads/{unique_filename}"
     return {"url": url}

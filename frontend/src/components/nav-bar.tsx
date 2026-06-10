@@ -193,7 +193,7 @@ export function NavBar() {
 
               {showDropdown && (
                 <div
-                  className="panel"
+                  className="glass-panel"
                   style={{
                     position: "absolute",
                     top: "100%",
@@ -203,11 +203,7 @@ export function NavBar() {
                     overflowY: "auto",
                     zIndex: 1000,
                     marginTop: 10,
-                    boxShadow: "0 10px 40px rgba(0,0,0,0.35)",
-                    border: "1px solid var(--border)",
-                    backgroundColor: "var(--bg-card, #1e293b)",
-                    backdropFilter: "blur(16px)",
-                    borderRadius: "var(--radius-lg, 12px)",
+                    borderRadius: "var(--radius)",
                     padding: 16,
                   }}
                 >
@@ -237,12 +233,11 @@ export function NavBar() {
                           onClick={() => handleNotificationClick(notif)}
                           style={{
                             padding: 12,
-                            borderRadius: "var(--radius-md, 8px)",
+                            borderRadius: "var(--radius-sm, 6px)",
                             backgroundColor: notif.is_read ? "transparent" : "rgba(249, 177, 122, 0.06)",
-                            border: notif.is_read ? "1px solid var(--border)" : "1px solid rgba(249, 177, 122, 0.25)",
+                            border: notif.is_read ? "1px solid rgba(103, 111, 157, 0.2)" : "1px solid rgba(249, 177, 122, 0.25)",
                             cursor: "pointer",
                             fontSize: 13,
-                            transition: "all var(--transition)",
                             marginBottom: 4
                           }}
                           className="notification-item"
@@ -288,7 +283,7 @@ export function NavBar() {
 
               {showAvatarDropdown && (
                 <div
-                  className="avatar-dropdown-panel"
+                  className="glass-panel"
                   style={{
                     position: "absolute",
                     top: "100%",
@@ -296,22 +291,19 @@ export function NavBar() {
                     width: 200,
                     zIndex: 1001,
                     marginTop: 8,
-                    boxShadow: "var(--shadow-lg)",
-                    border: "1px solid var(--border)",
-                    backgroundColor: "var(--bg-card, #171826)",
-                    backdropFilter: "blur(16px)",
                     borderRadius: "var(--radius)",
-                    padding: "8px 0",
+                    padding: "8px",
                     display: "flex",
-                    flexDirection: "column"
+                    flexDirection: "column",
+                    gap: "4px"
                   }}
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", marginBottom: 4 }}>
+                  <div style={{ padding: "8px 12px 12px", borderBottom: "1px solid var(--glass-border)", marginBottom: 4 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, color: "var(--text)" }}>
                       {user.profile?.full_name ?? user.email}
                     </div>
-                    <div className="muted" style={{ fontSize: 11, wordBreak: "break-all" }}>
+                    <div className="muted" style={{ fontSize: 11, wordBreak: "break-all", opacity: 0.7 }}>
                       {user.email}
                     </div>
                   </div>
@@ -320,7 +312,6 @@ export function NavBar() {
                     href="/profile"
                     className="dropdown-item"
                     onClick={() => setShowAvatarDropdown(false)}
-                    style={{ padding: "8px 16px", fontSize: 13, color: "var(--text)", textDecoration: "none", display: "block" }}
                   >
                     👤 Hồ sơ cá nhân
                   </Link>
@@ -328,7 +319,6 @@ export function NavBar() {
                     href="/dashboard/offers"
                     className="dropdown-item"
                     onClick={() => setShowAvatarDropdown(false)}
-                    style={{ padding: "8px 16px", fontSize: 13, color: "var(--text)", textDecoration: "none", display: "block" }}
                   >
                     💼 Giao dịch của tôi
                   </Link>
@@ -336,7 +326,6 @@ export function NavBar() {
                     href="/listings/new"
                     className="dropdown-item"
                     onClick={() => setShowAvatarDropdown(false)}
-                    style={{ padding: "8px 16px", fontSize: 13, color: "var(--text)", textDecoration: "none", display: "block" }}
                   >
                     ＋ Đăng tin mới
                   </Link>
@@ -344,12 +333,11 @@ export function NavBar() {
                     href="/profile/recycle-bin"
                     className="dropdown-item"
                     onClick={() => setShowAvatarDropdown(false)}
-                    style={{ padding: "8px 16px", fontSize: 13, color: "var(--text)", textDecoration: "none", display: "block" }}
                   >
                     🗑️ Thùng rác (Tin đã xóa)
                   </Link>
                   
-                  <div className="divider" style={{ margin: "4px 0", height: 1, backgroundColor: "var(--border)" }} />
+                  <div className="divider" style={{ margin: "4px 0", height: 1, backgroundColor: "var(--glass-border)" }} />
                   
                   <button
                     type="button"
@@ -357,16 +345,14 @@ export function NavBar() {
                       setShowAvatarDropdown(false);
                       logout();
                     }}
+                    className="dropdown-item"
                     style={{
                       background: "transparent",
                       border: "none",
                       textAlign: "left",
                       width: "100%",
-                      padding: "8px 16px",
-                      fontSize: 13,
                       color: "var(--danger, #ff6b6b)",
                       cursor: "pointer",
-                      display: "block"
                     }}
                   >
                     🚪 Đăng xuất

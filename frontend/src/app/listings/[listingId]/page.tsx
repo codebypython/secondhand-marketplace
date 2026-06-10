@@ -12,6 +12,7 @@ import type { Listing } from "@/lib/types";
 import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
 import { LocationDisplay } from "@/components/location-display";
 import { Video, Tv, X } from "lucide-react";
+import styles from "@/components/product/ProductDetail.module.css";
 
 export default function ListingDetailPage() {
   const params = useParams<{ listingId: string }>();
@@ -504,32 +505,28 @@ export default function ListingDetailPage() {
 
   return (
     <PageShell title={listing.title}>
-      <div className="grid two">
+      <div className={styles.container}>
         {/* Left: Images + Product Info */}
-        <section style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <section className={styles.leftCol}>
           {/* Image gallery */}
           {listing.image_urls.length > 0 ? (
-            <div className="panel" style={{ padding: 0, overflow: "hidden" }}>
-              <div style={{
-                height: 320,
-                background: `url(${listing.image_urls[currentImage]}) center/contain no-repeat`,
-                backgroundColor: "var(--bg-inset)",
-              }} />
+            <div className={`${styles.galleryWrapper} glass-panel`}>
+              <div
+                className={styles.mainImage}
+                style={{
+                  backgroundImage: `url(${listing.image_urls[currentImage]})`,
+                }}
+              />
               {listing.image_urls.length > 1 ? (
-                <div style={{ display: "flex", gap: 4, padding: 8, overflowX: "auto" }}>
+                <div className={styles.thumbnailContainer}>
                   {listing.image_urls.map((url, i) => (
                     <button
                       key={i}
                       type="button"
                       onClick={() => setCurrentImage(i)}
+                      className={`${styles.thumbnail} ${i === currentImage ? styles.activeThumbnail : ""}`}
                       style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: "var(--radius-sm)",
-                        background: `url(${url}) center/cover no-repeat`,
-                        border: i === currentImage ? "2px solid var(--accent)" : "2px solid transparent",
-                        cursor: "pointer",
-                        flexShrink: 0,
+                        backgroundImage: `url(${url})`,
                       }}
                     />
                   ))}
@@ -537,19 +534,19 @@ export default function ListingDetailPage() {
               ) : null}
             </div>
           ) : (
-            <div className="panel" style={{ height: 240, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48, color: "var(--text-tertiary)" }}>📷</div>
+            <div className={`${styles.galleryWrapper} glass-panel`} style={{ height: 240, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 48, color: "var(--text-tertiary)" }}>📷</div>
           )}
 
           {/* Description Video if exists */}
           {listing.video_url && (
-            <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <div className={`${styles.detailPanel} glass-panel`}>
               <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>🎥 Video mô tả sản phẩm</h3>
               <video src={listing.video_url} controls style={{ width: "100%", maxHeight: 360, borderRadius: 8, background: "#000" }} />
             </div>
           )}
 
           {/* Product info card */}
-          <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className={`${styles.detailPanel} glass-panel`}>
             <div className="inline">
               <span className={`badge ${statusCls}`}>{statusLabels[listing.status] ?? listing.status}</span>
               <span className="badge">{conditionLabels[listing.condition] ?? listing.condition}</span>
@@ -558,9 +555,9 @@ export default function ListingDetailPage() {
               {listing.has_warranty ? <span className="badge badge-success">✓ Còn bảo hành</span> : null}
             </div>
 
-            <div className="price">{formatPrice(listing.price)} ₫</div>
+            <div className={styles.price}>{formatPrice(listing.price)} ₫</div>
 
-            <p style={{ lineHeight: 1.7, color: "var(--text-secondary)" }}>
+            <p className={styles.description}>
               {listing.description ?? "Chưa có mô tả chi tiết."}
             </p>
 
@@ -579,7 +576,7 @@ export default function ListingDetailPage() {
 
             <div className="divider" />
 
-            <div className="inline">
+            <div className={styles.actionRow}>
               <button className="button secondary sm" type="button" onClick={handleFavorite}>
                 {favorited ? "❤️ Đã thích" : "🤍 Yêu thích"}
               </button>
@@ -595,7 +592,7 @@ export default function ListingDetailPage() {
             </div>
 
             {showWishlistSelector && (
-              <div className="panel" style={{ marginTop: 10, background: "var(--bg-inset)", display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: "var(--radius)" }}>
+              <div className={`${styles.detailPanel} glass-panel`} style={{ marginTop: 10, background: "var(--bg-inset)", display: "flex", flexDirection: "column", gap: 10, padding: 12, borderRadius: "var(--radius)" }}>
                 <h4 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>Chọn danh sách ước (Wishlist)</h4>
                 {wishlists.length > 0 ? (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -626,7 +623,7 @@ export default function ListingDetailPage() {
           </div>
 
           {/* Q&A Section */}
-          <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className={`${styles.detailPanel} glass-panel`}>
             <h3 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Hỏi & Đáp ({questions.length})</h3>
             
             {!isOwner && (
@@ -674,22 +671,10 @@ export default function ListingDetailPage() {
         </section>
 
         {/* Right: Seller + Actions */}
-        <section style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <section className={styles.rightCol}>
           {/* Seller card */}
-          <Link href={`/users/${listing.owner_id}`} className="panel" style={{ display: "flex", alignItems: "center", gap: 14, textDecoration: "none", transition: "border-color 0.2s" }}>
-            <div style={{
-              width: 52,
-              height: 52,
-              borderRadius: "var(--radius-full)",
-              background: "var(--accent)",
-              color: "var(--text-inverse)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 18,
-              fontWeight: 700,
-              flexShrink: 0,
-            }}>{sellerInitials}</div>
+          <Link href={`/users/${listing.owner_id}`} className={`${styles.sellerPanel} glass-panel`}>
+            <div className={styles.sellerAvatar}>{sellerInitials}</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 15 }}>{sellerName}</div>
               {listing.owner?.profile?.bio ? (
@@ -702,7 +687,7 @@ export default function ListingDetailPage() {
 
           {/* Owner Actions */}
           {isOwner && (
-            <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 14, border: "1px solid var(--border)" }}>
+            <div className={`${styles.detailPanel} glass-panel`}>
               <h2 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>⚙️ Quản lý tin đăng</h2>
               <p className="muted" style={{ fontSize: 13, margin: 0 }}>Bạn là chủ sở hữu của tin đăng này.</p>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -732,13 +717,13 @@ export default function ListingDetailPage() {
 
           {/* Livestream Area */}
           {!isOwner && (
-            <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 12, border: streamActive ? "1.5px solid var(--danger, #ef4444)" : "1px solid var(--border)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className={`${styles.detailPanel} ${styles.liveWrapper} ${streamActive ? styles.liveWrapperActive : ""} glass-panel`}>
+              <div className={styles.liveHeader}>
                 <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: 6 }}>
                   <Tv size={18} /> Livestream sản phẩm
                 </h3>
                 {streamActive && (
-                  <span style={{ fontSize: 11, background: "var(--danger, #ef4444)", color: "white", padding: "2px 6px", borderRadius: 4, fontWeight: "bold", animation: "pulse 1.5s infinite" }}>
+                  <span className={styles.liveIndicator}>
                     🔴 LIVE
                   </span>
                 )}
@@ -761,7 +746,7 @@ export default function ListingDetailPage() {
 
           {/* Offer form */}
           {!isOwner && listing.status === "AVAILABLE" ? (
-            <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div className={`${styles.detailPanel} glass-panel`}>
               <h2 style={{ fontSize: 17, fontWeight: 600, margin: 0 }}>💰 Đề xuất giá</h2>
               <p className="muted" style={{ fontSize: 13 }}>Giá đăng: {formatPrice(listing.price)} ₫ — Đề xuất mức giá bạn cho là hợp lý.</p>
               <div className="field">
@@ -775,9 +760,9 @@ export default function ListingDetailPage() {
           ) : null}
 
           {/* Report */}
-          <div className="panel" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className={`${styles.detailPanel} glass-panel`}>
             {!showReport ? (
-              <button className="button ghost sm" type="button" onClick={() => setShowReport(true)} style={{ alignSelf: "flex-start", color: "var(--text-tertiary)", fontSize: 13 }}>
+              <button className="button ghost sm" type="button" onClick={() => setShowReport(true)} style={{ alignSelf: "flex-start", color: "var(--text-tertiary)", fontSize: 13, padding: 0 }}>
                 🚩 Báo cáo vi phạm
               </button>
             ) : (

@@ -55,11 +55,65 @@ USERS = [
 # ==============================================================================
 # 2. CATEGORY DATA
 # ==============================================================================
-CATEGORIES = [
-    "Điện tử", "Thời trang", "Đồ gia dụng", "Sách & Học liệu",
-    "Xe cộ & Phụ kiện", "Đồ trẻ em", "Thể thao", "Nhiếp ảnh",
-    "Gaming", "Nội thất",
-]
+CATEGORIES_STRUCTURE = {
+    "Điện tử": [
+        ("Điện thoại", "dien-thoai"),
+        ("Laptop", "laptop"),
+        ("Máy tính bảng", "may-tinh-bang"),
+        ("Phụ kiện công nghệ", "phu-kien-cong-nghe")
+    ],
+    "Thời trang": [
+        ("Quần áo", "quan-ao"),
+        ("Giày dép", "giay-dep"),
+        ("Túi xách", "tui-xach"),
+        ("Đồng hồ & Phụ kiện", "dong-ho-phu-kien")
+    ],
+    "Đồ gia dụng": [
+        ("Dụng cụ nhà bếp", "dung-cu-nha-bep"),
+        ("Thiết bị gia đình", "thiet-bi-gia-dinh"),
+        ("Dọn dẹp & Vệ sinh", "don-dep-ve-sinh")
+    ],
+    "Sách & Học liệu": [
+        ("Sách giáo khoa", "sach-giao-khoa"),
+        ("Sách ngoại ngữ", "sach-ngoai-ngu"),
+        ("Truyện tranh", "truyen-tranh"),
+        ("Tài liệu học tập", "tai-lieu-hoc-tap")
+    ],
+    "Xe cộ & Phụ kiện": [
+        ("Xe máy", "xe-may"),
+        ("Xe đạp", "xe-dap"),
+        ("Phụ tùng xe", "phu-tung-xe"),
+        ("Đồ bảo hộ", "do-bao-ho")
+    ],
+    "Đồ trẻ em": [
+        ("Đồ chơi", "do-choi"),
+        ("Quần áo trẻ em", "quan-ao-tre-em"),
+        ("Xe đẩy & Cũi", "xe-day-cui"),
+        ("Sữa & Tã bỉm", "sua-ta-bim")
+    ],
+    "Thể thao": [
+        ("Dụng cụ tập gym", "dung-cu-tap-gym"),
+        ("Vợt & Bóng", "vot-bong"),
+        ("Giày thể thao", "giay-the-thao"),
+        ("Trang phục thể thao", "trang-phuc-the-thao")
+    ],
+    "Nhiếp ảnh": [
+        ("Máy ảnh", "may-anh"),
+        ("Ống kính", "ong-kinh"),
+        ("Chân máy & Gậy", "chan-may-gay"),
+        ("Đèn & Phụ kiện studio", "den-phu-kien-studio")
+    ],
+    "Gaming": [
+        ("Máy chơi game", "may-choi-game"),
+        ("Đĩa game & Thẻ", "dia-game-the"),
+        ("Phụ kiện gaming", "phu-kien-gaming")
+    ],
+    "Nội thất": [
+        ("Bàn & Ghế", "ban-ghe"),
+        ("Giường & Tủ", "giuong-tu"),
+        ("Trang trí nhà cửa", "trang-tri-nha-cua")
+    ]
+}
 
 # ==============================================================================
 # 3. LISTINGS DATA
@@ -211,13 +265,27 @@ def seed():
         session.flush()
 
         # --- Categories ---
-        categories = []
-        for name in CATEGORIES:
-            cat = Category(name=name)
-            session.add(cat)
-            categories.append(cat)
-        session.flush()
-        print(f"  [SUCCESS] Created {len(categories)} categories.")
+        parent_categories = []
+        child_categories_map = {} # parent_id -> list of child categories
+        total_cats_count = 0
+        
+        for parent_name, children_list in CATEGORIES_STRUCTURE.items():
+            parent_slug = parent_name.lower().replace(" ", "-").replace("&", "and").replace("đ", "d").replace("Đ", "d")
+            parent_cat = Category(name=parent_name, slug=parent_slug)
+            session.add(parent_cat)
+            session.flush()
+            parent_categories.append(parent_cat)
+            child_categories_map[parent_cat.id] = []
+            total_cats_count += 1
+            
+            for child_name, child_slug in children_list:
+                child_cat = Category(name=child_name, slug=child_slug, parent_id=parent_cat.id)
+                session.add(child_cat)
+                session.flush()
+                child_categories_map[parent_cat.id].append(child_cat)
+                total_cats_count += 1
+                
+        print(f"  [SUCCESS] Created {total_cats_count} categories (including subcategories).")
 
         # --- Download High Quality Images ---
         print("  [SEED] Downloading mock images...")
@@ -312,16 +380,19 @@ def seed():
             created = owner.created_at + timedelta(days=random.randint(1, 15), hours=random.randint(0, 12))
             
             # Match listing to pre-downloaded images
-            cat_name = categories[cat_idx].name
+            parent_cat = parent_categories[cat_idx]
+            cat_name = parent_cat.name
             pool = local_images.get(cat_name, [])
             image_urls = [random.choice(pool)] if pool else []
 
             # Generate random coords and address within 1-20km of DUT
             lat, lng, address = get_danang_coords_and_address(idx)
             
+            chosen_cat = random.choice(child_categories_map[parent_cat.id])
+            
             listing = Listing(
                 owner_id=str(owner.id),
-                category_id=str(categories[cat_idx].id),
+                category_id=str(chosen_cat.id),
                 title=title,
                 description=desc,
                 price=Decimal(str(price)),

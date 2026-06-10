@@ -1,0 +1,214 @@
+.container {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  min-height: 600px;
+  height: calc(100vh - 180px);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: all var(--transition-medium);
+}
+
+.sidebarActive {
+  grid-template-columns: 340px 1fr 300px;
+}
+
+.leftPane {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--glass-border);
+  background: rgba(23, 24, 38, 0.2);
+}
+
+.rightPane {
+  display: flex;
+  flex-direction: column;
+  background: rgba(23, 24, 38, 0.1);
+  overflow: hidden;
+}
+
+.infoPane {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--glass-border);
+  background: rgba(23, 24, 38, 0.25);
+  animation: slideLeft var(--transition-medium) forwards;
+}
+
+.header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(23, 24, 38, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.searchBar {
+  padding: 10px 14px;
+  margin: 12px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--glass-border);
+  background: rgba(23, 24, 38, 0.4);
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.searchBar:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--ring-focus);
+}
+
+.conversationList {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.messageArea {
+  flex: 1;
+  padding: 20px 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.inputArea {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(23, 24, 38, 0.3);
+}
+
+.inputField {
+  flex: 1;
+  background: rgba(23, 24, 38, 0.4);
+  border: 1px solid var(--glass-border);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 14px;
+  outline: none;
+  resize: none;
+  transition: all var(--transition-fast);
+}
+
+.inputField:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--ring-focus);
+}
+
+/* Call modal styling */
+.callOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn var(--transition-medium) forwards;
+}
+
+.callCard {
+  width: 100%;
+  max-width: 480px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 24px;
+  box-shadow: var(--shadow-lg), 0 0 30px var(--glow-accent);
+}
+
+.callAvatar {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--color-peach), var(--color-lavender));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--card-bg);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.callRing {
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 1px;
+  animation: pulse 1.5s infinite;
+}
+
+.videoStage {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+  height: 240px;
+}
+
+.videoViewport {
+  position: relative;
+  background: #090a0f;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--glass-border);
+  height: 100%;
+}
+
+.videoStream {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.selfVideo {
+  transform: scaleX(-1);
+}
+
+@keyframes slideLeft {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+  .sidebarActive {
+    grid-template-columns: 1fr;
+  }
+  .infoPane {
+    display: none;
+  }
+}

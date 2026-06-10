@@ -186,7 +186,7 @@ export default function ProfilePage() {
         {/* Left: Account info + edit */}
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           {/* Profile card */}
-          <div className="profile-info-card" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <div className="glass-panel" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16, padding: 24, borderRadius: "var(--radius-lg)" }}>
             <div style={{
               width: 80, height: 80, borderRadius: "var(--radius-full)",
               background: "var(--accent)", color: "var(--text-inverse)",
@@ -424,7 +424,7 @@ export default function ProfilePage() {
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                   {wishlists.map(wl => (
-                    <div key={wl.id} className="panel" style={{ display: "flex", flexDirection: "column", gap: 12, border: "1px solid var(--border)", padding: 16 }}>
+                    <div key={wl.id} className="glass-panel" style={{ display: "flex", flexDirection: "column", gap: 12, padding: 16, borderRadius: "var(--radius)" }}>
                       <div className="split">
                         <strong style={{ fontSize: 15 }}>📁 {wl.name}</strong>
                         <span className="muted" style={{ fontSize: 12 }}>{wl.items.length} sản phẩm</span>

@@ -10,6 +10,7 @@ import { api } from "@/lib/api";
 import type { Conversation, Message } from "@/lib/types";
 import Link from "next/link";
 import { getInitials, timeAgo, formatPrice } from "@/lib/utils";
+import styles from "./inbox.module.css";
 
 export default function InboxPage() {
   const { token, user } = useAuth();
@@ -525,10 +526,10 @@ export default function InboxPage() {
 
   return (
     <PageShell title="Hộp thư" description="Nhắn tin với người mua và người bán">
-      <div className="grid two" style={{ gridTemplateColumns: showSidebar ? "340px 1fr 300px" : "340px 1fr", minHeight: 560, transition: "grid-template-columns 250ms ease" }}>
+      <div className={`${styles.container} ${showSidebar ? styles.sidebarActive : ""}`}>
         {/* Left: Conversation list */}
-        <div className="inbox-section" style={{ display: "flex", flexDirection: "column", gap: 0, padding: 0, overflow: "hidden" }}>
-          <div className="inbox-section-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <div className={styles.leftPane}>
+          <div className={styles.header}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <MessageCircle size={18} />
               <span>Hội thoại</span>
@@ -539,14 +540,14 @@ export default function InboxPage() {
             </button>
           </div>
           <input
-            className="inbox-search"
+            className={styles.searchBar}
             placeholder="🔍 Tìm kiếm hội thoại..."
             value={searchConv}
             onChange={(e) => setSearchConv(e.target.value)}
           />
 
           {showCreate ? (
-            <div style={{ padding: 14, borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ padding: 14, borderBottom: "1px solid var(--glass-border)", display: "flex", flexDirection: "column", gap: 8 }}>
               <div className="field">
                 <label style={{ fontSize: 12 }}>ID người tham gia</label>
                 <input placeholder="UUID..." value={participantId} onChange={(e) => setParticipantId(e.target.value)} style={{ fontSize: 13 }} />
@@ -563,11 +564,11 @@ export default function InboxPage() {
             </div>
           ) : null}
 
-          <div style={{ flex: 1, overflow: "auto" }}>
+          <div className={styles.conversationList}>
             {loading ? (
               <div style={{ padding: 16 }}>{[1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: 64, marginBottom: 4, borderRadius: "var(--radius)" }} />)}</div>
             ) : filteredConversations.length === 0 ? (
-              <div className="inbox-empty">
+              <div className="inbox-empty" style={{ margin: 16 }}>
                 <div style={{ fontSize: 24 }}><MessageCircle size={40} style={{ color: "var(--text-tertiary)", margin: "0 auto" }} /></div>
                 <h3>{searchConv ? "Không tìm thấy" : "Chưa có hội thoại"}</h3>
                 <p>{searchConv ? "Thử tìm kiếm khác" : "Bắt đầu nhắn tin từ trang chi tiết sản phẩm."}</p>
@@ -616,11 +617,11 @@ export default function InboxPage() {
         </div>
 
         {/* Right: Chat area */}
-        <div className="panel" style={{ display: "flex", flexDirection: "column", padding: 0, overflow: "hidden" }}>
+        <div className={styles.rightPane}>
           {selected ? (
             <>
               {/* Chat header */}
-              <div style={{ padding: "14px 20px", borderBottom: "1px solid var(--border)", background: "var(--bg-card)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div className={styles.header}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div className="conversation-avatar" style={{ width: 36, height: 36, fontSize: 14 }}>
                     {getInitials(
@@ -660,7 +661,7 @@ export default function InboxPage() {
               </div>
 
               {/* Messages */}
-              <div className="chat-area" style={{ flex: 1, padding: "20px 16px" }}>
+              <div className={styles.messageArea}>
                 {selected.messages.length === 0 ? (
                   <div className="empty-state" style={{ flex: 1 }}>
                     <div className="empty-icon">👋</div>
@@ -756,7 +757,7 @@ export default function InboxPage() {
               </div>
 
               {/* Input */}
-              <div className="chat-input-area" style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px" }}>
+              <div className={styles.inputArea}>
                 <label 
                   style={{ 
                     cursor: uploadingImage ? "not-allowed" : "pointer", 
@@ -780,13 +781,14 @@ export default function InboxPage() {
                   <Image size={18} />
                 </label>
                 <textarea
+                  className={styles.inputField}
                   placeholder={uploadingImage ? "Đang tải ảnh..." : "Nhập tin nhắn... (Enter để gửi)"}
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   onKeyDown={handleKeyDown}
                   disabled={uploadingImage}
                   rows={1}
-                  style={{ minHeight: 40, maxHeight: 100, flex: 1, resize: "none" }}
+                  style={{ minHeight: 40, maxHeight: 100, flex: 1 }}
                 />
                 <button className="button primary sm" type="button" onClick={handleSend} disabled={sending || uploadingImage || !messageText.trim()}>
                   {sending ? "..." : "Gửi →"}
@@ -804,22 +806,9 @@ export default function InboxPage() {
 
         {/* Sidebar container */}
         {showSidebar && selected && (
-          <div
-            className="panel"
-            style={{
-              borderLeft: "1px solid var(--border)",
-              backgroundColor: "var(--bg-card)",
-              padding: 20,
-              display: "flex",
-              flexDirection: "column",
-              gap: 20,
-              overflowY: "auto",
-              width: 300,
-              flexShrink: 0
-            }}
-          >
+          <div className={styles.infoPane} style={{ width: 300, flexShrink: 0, padding: 20, overflowY: "auto" }}>
             {/* Header */}
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, borderBottom: "1px solid var(--border)", paddingBottom: 10 }}>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, borderBottom: "1px solid var(--glass-border)", paddingBottom: 10 }}>
               Thông tin hội thoại
             </h3>
             
@@ -831,7 +820,7 @@ export default function InboxPage() {
               const initials = getInitials(partner.profile?.full_name, partner.email?.[0]?.toUpperCase());
               
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: 14 }}>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, textAlign: "center" }}>
                     <div style={{
                       width: 64, height: 64, borderRadius: "50%",
@@ -867,7 +856,7 @@ export default function InboxPage() {
               );
             })()}
             
-            <div className="divider" style={{ height: 1, backgroundColor: "var(--border)", margin: "4px 0" }} />
+            <div className="divider" style={{ height: 1, backgroundColor: "var(--glass-border)", margin: "14px 0" }} />
             
             {/* Statistics */}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -887,7 +876,7 @@ export default function InboxPage() {
             {/* Listing Details */}
             {selected.listing_id && (
               <>
-                <div className="divider" style={{ height: 1, backgroundColor: "var(--border)", margin: "4px 0" }} />
+                <div className="divider" style={{ height: 1, backgroundColor: "var(--glass-border)", margin: "14px 0" }} />
                 <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                   <h4 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>Sản phẩm quan tâm</h4>
                   {loadingListing ? (
@@ -918,12 +907,7 @@ export default function InboxPage() {
 
       {/* WebRTC Video Call Overlay Modal */}
       {callActive && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          background: "rgba(15, 23, 42, 0.95)", backdropFilter: "blur(12px)",
-          zIndex: 9999, display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center", color: "white", padding: 20
-        }}>
+        <div className={styles.callOverlay}>
           <div style={{ width: "100%", maxWidth: 900, display: "flex", flexDirection: "column", gap: 20 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <h2 style={{ color: "white", margin: 0 }}>📞 Cuộc gọi Video WebRTC</h2>
@@ -932,15 +916,15 @@ export default function InboxPage() {
               </span>
             </div>
             
-            <div className="grid two" style={{ gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            <div className={styles.videoStage}>
               {/* Local Stream */}
-              <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "#1e293b", height: 350 }}>
+              <div className={styles.videoViewport}>
                 <video 
                   ref={(el) => { if (el) el.srcObject = localStream; }} 
                   autoPlay 
                   playsInline 
                   muted 
-                  style={{ width: "100%", height: "100%", objectFit: "cover", transform: "scaleX(-1)" }} 
+                  className={`${styles.videoStream} ${styles.selfVideo}`}
                 />
                 <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(0,0,0,0.6)", padding: "4px 8px", borderRadius: 4, fontSize: 12 }}>
                   Bạn (Local camera)
@@ -948,13 +932,13 @@ export default function InboxPage() {
               </div>
               
               {/* Remote Stream */}
-              <div style={{ position: "relative", borderRadius: 12, overflow: "hidden", border: "1px solid var(--border)", background: "#1e293b", height: 350 }}>
+              <div className={styles.videoViewport}>
                 {remoteStream ? (
                   <video 
                     ref={(el) => { if (el) el.srcObject = remoteStream; }} 
                     autoPlay 
                     playsInline 
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                    className={styles.videoStream} 
                   />
                 ) : (
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", color: "var(--text-muted)" }}>
@@ -979,19 +963,17 @@ export default function InboxPage() {
 
       {/* Incoming Call Ringing Overlay */}
       {isIncomingCall && (
-        <div style={{
+        <div className="glass-panel" style={{
           position: "fixed", top: 20, right: 20, width: 320,
-          background: "var(--bg-card)", border: "2px solid var(--primary)",
-          borderRadius: 12, boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
           zIndex: 10000, padding: 16, display: "flex", flexDirection: "column", gap: 12,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: "rgba(99, 102, 241, 0.15)", color: "var(--primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
+            <div style={{ width: 40, height: 40, borderRadius: "50%", backgroundColor: "rgba(249, 177, 122, 0.15)", color: "var(--accent)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>
               📞
             </div>
             <div>
               <div style={{ fontWeight: 600 }}>{callerName}</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>Cuộc gọi video tới...</div>
+              <div className={styles.callRing}>Cuộc gọi video tới...</div>
             </div>
           </div>
           

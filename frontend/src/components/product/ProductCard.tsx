@@ -4,17 +4,17 @@ import Badge from '@/components/ui/Badge';
 import styles from './ProductCard.module.css';
 
 const conditionLabels: Record<string, string> = {
-  NEW: 'New',
-  LIKE_NEW: 'Like New',
-  USED: 'Used',
-  DAMAGED: 'Damaged',
+  NEW: "Mới",
+  LIKE_NEW: "Như mới",
+  USED: "Đã dùng",
+  DAMAGED: "Hỏng / Trầy xước",
 };
 
 const statusLabels: Record<string, string> = {
-  AVAILABLE: 'Available',
-  RESERVED: 'Reserved',
-  SOLD: 'Sold',
-  HIDDEN: 'Hidden',
+  AVAILABLE: "Đang bán",
+  RESERVED: "Đã đặt trước",
+  SOLD: "Đã bán",
+  HIDDEN: "Đã ẩn",
 };
 
 const statusVariants: Record<string, any> = {

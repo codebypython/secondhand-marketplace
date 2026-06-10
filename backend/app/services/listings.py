@@ -139,7 +139,12 @@ def list_listings(
         selectinload(Listing.category),
     )
     if category_id:
-        stmt = stmt.where(Listing.category_id == category_id)
+        category_ids = [category_id]
+        # Query children categories (up to 2 levels is sufficient)
+        child_stmt = select(Category.id).where(Category.parent_id == category_id)
+        child_ids = list(session.scalars(child_stmt).all())
+        category_ids.extend(child_ids)
+        stmt = stmt.where(Listing.category_id.in_(category_ids))
     if condition:
         stmt = stmt.where(Listing.condition == condition)
     if status:

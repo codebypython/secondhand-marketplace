@@ -309,7 +309,7 @@ export default function OffersDashboardPage() {
               const isBuyer = user?.id === deal.buyer_id;
 
               return (
-                <div className="panel" key={deal.id} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div className="glass-panel" key={deal.id} style={{ display: "flex", flexDirection: "column", gap: 14, padding: 20, borderRadius: "var(--radius-lg)" }}>
                   <div className="split">
                     <div>
                       {deal.listing_title ? (

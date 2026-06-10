@@ -68,12 +68,19 @@ Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", 
 
 # 6. Auto-start and retrieve Ngrok tunnel if installed
 $ngrokUrl = $null
-$ngrokPath = Get-Command ngrok -ErrorAction SilentlyContinue
-if ($ngrokPath) {
+$ngrokExe = $null
+
+if (Test-Path "$PSScriptRoot\ngrok.exe") {
+    $ngrokExe = "$PSScriptRoot\ngrok.exe"
+} elseif (Get-Command ngrok -ErrorAction SilentlyContinue) {
+    $ngrokExe = "ngrok"
+}
+
+if ($ngrokExe) {
     Write-Host "`n[Ngrok] Phát hiện Ngrok... Đang tự động mở cổng tunnel cho Frontend (cổng $WebPort1)..." -ForegroundColor Yellow
     
     # Start ngrok in background (silenced stdout logs, hidden window)
-    $ngrokProcess = Start-Process ngrok -ArgumentList "http $WebPort1 --log=stdout" -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+    $ngrokProcess = Start-Process $ngrokExe -ArgumentList "http $WebPort1 --log=stdout" -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
     
     # Wait for ngrok API initialization (usually 2-3 seconds)
     Start-Sleep -Seconds 3

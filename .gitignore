@@ -19,3 +19,5 @@ frontend/.env.local
 frontend/.env
 *.sqlite3
 *.db
+ngrok.exe
+ngrok/

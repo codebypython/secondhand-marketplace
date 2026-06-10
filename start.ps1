@@ -66,13 +66,40 @@ Write-Host "Starting Frontend Client on port $WebPort1..." -ForegroundColor Gree
 $frontendCmd1 = "Set-Location `"$PSScriptRoot\frontend`"; `$env:PORT=$WebPort1; & `".\node_modules\.bin\next`" dev --webpack --hostname 0.0.0.0 --port $WebPort1"
 Start-Process powershell -ArgumentList "-NoExit", "-ExecutionPolicy", "Bypass", "-Command", $frontendCmd1 | Out-Null
 
+# 6. Auto-start and retrieve Ngrok tunnel if installed
+$ngrokUrl = $null
+$ngrokPath = Get-Command ngrok -ErrorAction SilentlyContinue
+if ($ngrokPath) {
+    Write-Host "`n[Ngrok] Phát hiện Ngrok... Đang tự động mở cổng tunnel cho Frontend (cổng $WebPort1)..." -ForegroundColor Yellow
+    
+    # Start ngrok in background (silenced stdout logs, hidden window)
+    $ngrokProcess = Start-Process ngrok -ArgumentList "http $WebPort1 --log=stdout" -PassThru -WindowStyle Hidden -ErrorAction SilentlyContinue
+    
+    # Wait for ngrok API initialization (usually 2-3 seconds)
+    Start-Sleep -Seconds 3
+    
+    try {
+        # Fetch active tunnel config from ngrok agent local API (port 4040)
+        $tunnels = Invoke-RestMethod -Uri "http://127.0.0.1:4040/api/tunnels" -TimeoutSec 2
+        $ngrokUrl = $tunnels.tunnels | Where-Object { $_.proto -eq "https" } | Select-Object -ExpandProperty public_url -First 1
+    } catch {
+        # Fail silently if authtoken isn't configured yet
+    }
+}
+
 Write-Host "`n==========================================================" -ForegroundColor Green
 Write-Host "🎉 CLIENT-SERVER SYSTEM STARTED SUCCESSFULLY!" -ForegroundColor Green
 Write-Host "----------------------------------------------------------" -ForegroundColor Yellow
 Write-Host "• Backend API:  http://localhost:$ApiPort/docs (or http://$localIp`:$ApiPort/docs)"
 Write-Host "• Frontend URL: http://localhost:$WebPort1 (or http://$localIp`:$WebPort1)"
 Write-Host "👉 LAN Access:  http://$localIp`:$WebPort1" -ForegroundColor Green
-Write-Host "👉 iOS/iPhone (Secure HTTPS): Run 'npx ngrok http $WebPort1' to get HTTPS URL." -ForegroundColor Green
-Write-Host "👉 Multi-user Demo: Open one normal tab and one Incognito (Private) tab pointing to the Frontend URL." -ForegroundColor Cyan
-Write-Host "👉 Run .\stop.ps1 to stop all backend and frontend processes." -ForegroundColor Red
+if ($ngrokUrl) {
+    Write-Host "👉 Ngrok HTTPS: $ngrokUrl" -ForegroundColor Magenta
+    Write-Host "   (Dùng liên kết HTTPS này trên iPhone/Điện thoại để truy cập Camera & Định vị GPS)" -ForegroundColor Gray
+} else {
+    Write-Host "👉 iOS/iPhone (Secure HTTPS): Chạy 'npx ngrok http $WebPort1' để lấy link HTTPS." -ForegroundColor Green
+    Write-Host "   (Hoặc tải ngrok về máy và chạy 'ngrok config add-authtoken <TOKEN>' để hệ thống tự tạo link)" -ForegroundColor Gray
+}
+Write-Host "👉 Multi-user Demo: Mở 1 tab ẩn danh và 1 tab thường để giả lập Người mua & Người bán chat với nhau." -ForegroundColor Cyan
+Write-Host "👉 Chạy .\stop.ps1 để dừng toàn bộ tiến trình hệ thống." -ForegroundColor Red
 Write-Host "==========================================================" -ForegroundColor Green

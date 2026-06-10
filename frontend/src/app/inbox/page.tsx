@@ -112,9 +112,21 @@ export default function InboxPage() {
   useEffect(() => {
     if (!token) return;
 
-    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
-    const wsBase = apiBase.replace(/^http/, "ws");
-    const wsUrl = `${wsBase}/chat/ws/${token}`;
+    let wsUrl = "";
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      const wsBase = process.env.NEXT_PUBLIC_API_URL.replace(/^http/, "ws");
+      wsUrl = `${wsBase}/chat/ws/${token}`;
+    } else if (typeof window !== "undefined") {
+      const isSecure = window.location.protocol === "https:";
+      const wsProtocol = isSecure ? "wss:" : "ws:";
+      if (isSecure) {
+        wsUrl = `${wsProtocol}//${window.location.host}/api/v1/chat/ws/${token}`;
+      } else {
+        wsUrl = `${wsProtocol}//${window.location.hostname}:8000/api/v1/chat/ws/${token}`;
+      }
+    } else {
+      wsUrl = `ws://localhost:8000/api/v1/chat/ws/${token}`;
+    }
 
     console.log("Connecting to WebSocket:", wsUrl);
     const ws = new WebSocket(wsUrl);

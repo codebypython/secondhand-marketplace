@@ -76,7 +76,7 @@ export default function ModerationPage() {
   const downloadCSV = async (endpoint: string, filename: string) => {
     if (!token) return;
     try {
-      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1"}${endpoint}`, {
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1"}${endpoint}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!resp.ok) throw new Error("Export failed");

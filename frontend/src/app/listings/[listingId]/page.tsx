@@ -270,7 +270,7 @@ export default function ListingDetailPage() {
         wsUrl = `${wsProtocol}//${window.location.hostname}:8000/api/v1/chat/ws/${token}`;
       }
     } else {
-      wsUrl = `ws://localhost:8000/api/v1/chat/ws/${token}`;
+      wsUrl = `ws://127.0.0.1:8000/api/v1/chat/ws/${token}`;
     }
 
     const ws = new WebSocket(wsUrl);

@@ -8,7 +8,7 @@ import { PageShell } from "@/components/page-shell";
 import { useAuth } from "@/components/auth-provider";
 import { api } from "@/lib/api";
 import type { Listing, UserPublic } from "@/lib/types";
-import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo } from "@/lib/utils";
+import { conditionLabels, formatDate, formatPrice, getInitials, statusLabels, timeAgo, getMediaUrl } from "@/lib/utils";
 
 interface ReviewItem {
   id: string;
@@ -117,7 +117,7 @@ export default function UserProfilePage() {
     <PageShell title={name}>
       {userProfile.profile?.banner_url && (
         <div style={{ width: "100%", height: 200, borderRadius: "var(--radius-lg)", marginBottom: 24, overflow: "hidden", background: "var(--border)" }}>
-          <img src={userProfile.profile.banner_url} alt="Shop Banner" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={getMediaUrl(userProfile.profile.banner_url)} alt="Shop Banner" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
       )}
       <div className="grid two" style={{ gridTemplateColumns: "320px 1fr" }}>
@@ -135,9 +135,19 @@ export default function UserProfilePage() {
               justifyContent: "center",
               fontSize: 36,
               fontWeight: 700,
+              overflow: "hidden",
+              border: "2px solid var(--border)"
             }}
           >
-            {initials}
+            {userProfile.profile?.avatar_url ? (
+              <img 
+                src={getMediaUrl(userProfile.profile.avatar_url)} 
+                alt={name} 
+                style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+              />
+            ) : (
+              initials
+            )}
           </div>
 
             <div style={{ textAlign: "center", width: "100%" }}>

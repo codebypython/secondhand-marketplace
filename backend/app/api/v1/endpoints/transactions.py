@@ -128,6 +128,37 @@ def cancel_offer_endpoint(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.get("/unread-count")
+def get_unread_transaction_count(
+    session: Session = Depends(get_db_session),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    from app.models.transaction import Offer, Deal
+    from app.models.enums import OfferStatus, DealStatus
+    from app.models.listing import Listing
+    from sqlalchemy import select, or_, and_
+
+    # 1. Offers received (I am seller) that are PENDING
+    stmt_received = select(Offer).join(Offer.listing).where(
+        and_(Listing.owner_id == current_user.id, Offer.status == OfferStatus.PENDING)
+    )
+    received_count = len(list(session.scalars(stmt_received).all()))
+
+    # 2. Offers sent (I am buyer) that are COUNTERED by seller
+    stmt_sent_countered = select(Offer).where(
+        and_(Offer.buyer_id == current_user.id, Offer.status == OfferStatus.COUNTERED)
+    )
+    sent_countered_count = len(list(session.scalars(stmt_sent_countered).all()))
+
+    # 3. Deals that are OPEN
+    stmt_deals = select(Deal).where(
+        and_(or_(Deal.buyer_id == current_user.id, Deal.seller_id == current_user.id), Deal.status == DealStatus.OPEN)
+    )
+    deals_count = len(list(session.scalars(stmt_deals).all()))
+
+    return {"count": received_count + sent_countered_count + deals_count}
+
+
 @router.get("/deals", response_model=list[DealRead])
 def list_deals_endpoint(session: Session = Depends(get_db_session), current_user: User = Depends(get_current_user)) -> Any:
     return [_deal_to_read(d) for d in list_user_deals(session, current_user)]

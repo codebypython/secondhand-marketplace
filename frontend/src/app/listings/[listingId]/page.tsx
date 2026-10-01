@@ -583,7 +583,17 @@ export default function ListingDetailPage() {
         <section className={styles.rightCol}>
           {/* Seller card */}
           <Link href={`/users/${listing.owner_id}`} className={`${styles.sellerPanel} glass-panel`}>
-            <div className={styles.sellerAvatar}>{sellerInitials}</div>
+            <div className={styles.sellerAvatar} style={{ overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--accent)", color: "white", fontWeight: "bold" }}>
+              {listing.owner?.profile?.avatar_url ? (
+                <img 
+                  src={getMediaUrl(listing.owner.profile.avatar_url)} 
+                  alt={sellerName} 
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                />
+              ) : (
+                sellerInitials
+              )}
+            </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 15 }}>{sellerName}</div>
               {listing.owner?.profile?.bio ? (

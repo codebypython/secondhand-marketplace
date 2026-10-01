@@ -34,6 +34,19 @@ def create_report(session: Session, reporter: User, payload: ReportCreate) -> Re
     session.add(report)
     session.commit()
     session.refresh(report)
+
+    # Broadcast moderation update
+    try:
+        import asyncio
+        from app.api.v1.endpoints.chat import manager
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast({"type": "moderation_update"}))
+        except RuntimeError:
+            asyncio.run(manager.broadcast({"type": "moderation_update"}))
+    except Exception:
+        pass
+
     return report
 
 
@@ -74,6 +87,19 @@ def review_report(session: Session, admin: User, report_id, payload: ReportRevie
         target_id=str(report.id),
         details={"status": status_val}
     )
+
+    # Broadcast moderation update
+    try:
+        import asyncio
+        from app.api.v1.endpoints.chat import manager
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast({"type": "moderation_update"}))
+        except RuntimeError:
+            asyncio.run(manager.broadcast({"type": "moderation_update"}))
+    except Exception:
+        pass
+
     return report
 
 
@@ -189,6 +215,19 @@ def resolve_dispute(session: Session, admin: User, deal_id, resolution: str) -> 
         target_id=str(deal.id),
         details={"resolution": resolution}
     )
+
+    # Broadcast moderation update
+    try:
+        import asyncio
+        from app.api.v1.endpoints.chat import manager
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast({"type": "moderation_update"}))
+        except RuntimeError:
+            asyncio.run(manager.broadcast({"type": "moderation_update"}))
+    except Exception:
+        pass
+
     return deal
 
 

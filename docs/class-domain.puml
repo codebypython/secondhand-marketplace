@@ -1,10 +1,10 @@
 @startuml Domain Model - Secondhand Marketplace
 
-' --- CẤU HÌNH THỂ HIỆN SƠ ĐỒ ĐẸP (KHÔNG LỖI) ---
-skinparam linetype ortho          ' Đường nối vuông góc, gọn gàng
-skinparam classAttributeIconSize 0 ' Hiện ký hiệu (+), (-) thay vì icon tròn màu sắc
+' --- CẤU HÌNH THỂ HIỆN SƠ ĐỒ ---
+skinparam linetype ortho          ' Ép vẽ vuông góc
+skinparam classAttributeIconSize 0 ' Hiện ký hiệu (+), (-) thay vì icon tròn
 skinparam shadowing true          ' Đổ bóng các hộp lớp tạo chiều sâu
-skinparam handwritten false       ' Font chữ tiêu chuẩn thẳng hàng chuyên nghiệp
+skinparam handwritten false       ' Font chữ tiêu chuẩn
 
 ' Tông màu chuyên nghiệp (Ocean Blue & Light Grey)
 skinparam class {
@@ -24,7 +24,7 @@ skinparam package {
 ' --- CÁC ĐỊNH NGHĨA LỚP TRONG TỪNG AGGREGATE ---
 
 package "User Aggregate" {
-  class User {
+  class User <<UUID, Timestamp, SoftDelete>> {
     - email: String
     - password_hash: String
     - role: UserRole
@@ -36,7 +36,7 @@ package "User Aggregate" {
     + ensure_active(): void
   }
   
-  class Profile {
+  class Profile <<UUID, Timestamp>> {
     - user_id: UUID
     - full_name: String
     - avatar_url: String
@@ -55,14 +55,14 @@ package "User Aggregate" {
 }
 
 package "Listing Aggregate" {
-  class Category {
+  class Category <<UUID, Timestamp, SoftDelete>> {
     - name: String
     - slug: String
     - image_url: String
     - parent_id: UUID
   }
   
-  class Listing {
+  class Listing <<UUID, Timestamp, SoftDelete, Version>> {
     - owner_id: UUID
     - category_id: UUID
     - title: String
@@ -84,12 +84,12 @@ package "Listing Aggregate" {
 }
 
 package "Conversation Aggregate" {
-  class Conversation {
+  class Conversation <<UUID, Timestamp, SoftDelete>> {
     - listing_id: UUID
     - title: String
   }
   
-  class Message {
+  class Message <<UUID, Timestamp, SoftDelete>> {
     - conversation_id: UUID
     - sender_id: UUID
     - content: String
@@ -98,7 +98,7 @@ package "Conversation Aggregate" {
 }
 
 package "Deal Aggregate" {
-  class Offer {
+  class Offer <<UUID, Timestamp, Version>> {
     - listing_id: UUID
     - buyer_id: UUID
     - price: Decimal
@@ -112,7 +112,7 @@ package "Deal Aggregate" {
     + cancel(): void
   }
   
-  class Deal {
+  class Deal <<UUID, Timestamp, Version>> {
     - listing_id: UUID
     - buyer_id: UUID
     - seller_id: UUID
@@ -127,7 +127,7 @@ package "Deal Aggregate" {
     + cancel(listing): void
   }
   
-  class Meetup {
+  class Meetup <<UUID, Timestamp>> {
     - deal_id: UUID
     - scheduled_at: DateTime
     - location: dict
@@ -138,7 +138,7 @@ package "Deal Aggregate" {
 }
 
 package "Moderation Aggregate" {
-  class Report {
+  class Report <<UUID, Timestamp>> {
     - reporter_id: UUID
     - target_type: ReportTargetType
     - target_id: UUID
@@ -146,19 +146,19 @@ package "Moderation Aggregate" {
     - status: ReportStatus
   }
   
-  class Block {
+  class Block <<UUID, Timestamp>> {
     - blocker_id: UUID
     - blocked_id: UUID
   }
 }
 
 package "Social Aggregate" {
-  class UserFollow {
+  class UserFollow <<UUID, Timestamp>> {
     - follower_id: UUID
     - following_id: UUID
   }
   
-  class Review {
+  class Review <<UUID, Timestamp>> {
     - reviewer_id: UUID
     - target_id: UUID
     - deal_id: UUID
@@ -166,18 +166,18 @@ package "Social Aggregate" {
     - comment: String
   }
   
-  class Wishlist {
+  class Wishlist <<UUID, Timestamp>> {
     - user_id: UUID
     - name: String
     - is_public: Boolean
   }
   
-  class WishlistItem {
+  class WishlistItem <<UUID, Timestamp>> {
     - wishlist_id: UUID
     - listing_id: UUID
   }
   
-  class ListingQuestion {
+  class ListingQuestion <<UUID, Timestamp>> {
     - listing_id: UUID
     - asker_id: UUID
     - question: String
@@ -186,7 +186,7 @@ package "Social Aggregate" {
 }
 
 package "System Logs & Notifications" {
-  class Notification {
+  class Notification <<UUID, Timestamp>> {
     - recipient_id: UUID
     - type: NotificationType
     - title: String
@@ -195,7 +195,7 @@ package "System Logs & Notifications" {
     - is_read: Boolean
   }
   
-  class ActivityLog {
+  class ActivityLog <<UUID, Timestamp>> {
     - actor_id: UUID
     - verb: String
     - target_type: String
@@ -204,8 +204,11 @@ package "System Logs & Notifications" {
   }
 }
 
-' --- CÁC MỐI QUAN HỆ (ĐẶT NGOÀI CÁC PACKAGE ĐỂ TRÁNH LỖI GRAPHVIZ DOT) ---
-' Sử dụng chuẩn Class Diagram với bản số (multiplicities) thay cho ký hiệu ERD chân chim
+' --- CÁC MỐI QUAN HỆ KẾ THỪA (EXTENDS) & PHỤ THUỘC (DEPENDENCY) ---
+Offer ..> Deal : <<create>>
+Deal ..> Listing : <<use>>
+
+' --- ĐẦY ĐỦ CÁC MỐI QUAN HỆ KHÔNG LƯỢC BỎ (DÀNH CHO DRAW.IO / SERVER RENDER) ---
 
 ' User Aggregate Relations
 User "1" -- "0..1" Profile : has
@@ -225,10 +228,10 @@ Listing "1" -- "0..1" Conversation : discussed_in
 ' Deal Aggregate Relations
 Listing "1" -- "*" Offer : receives
 User "1" -- "*" Offer : makes
-Offer "1" -- "0..1" Deal : creates
 Deal "1" -- "*" Meetup : schedules
 User "1" -- "*" Deal : participates_as_buyer
 User "1" -- "*" Deal : participates_as_seller
+Offer "1" -- "0..1" Deal : creates
 
 ' Moderation Aggregate Relations
 User "1" -- "*" Report : reporter

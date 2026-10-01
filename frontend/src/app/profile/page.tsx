@@ -25,6 +25,20 @@ export default function ProfilePage() {
   const [shopSlug, setShopSlug] = useState(() => user?.profile?.shop_slug ?? "");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (user?.profile) {
+      setFullName(user.profile.full_name ?? "");
+      setDisplayName(user.profile.display_name ?? "");
+      setAvatarUrl(user.profile.avatar_url ?? "");
+      setBannerUrl(user.profile.banner_url ?? "");
+      setBio(user.profile.bio ?? "");
+      setPhone(user.profile.phone ?? "");
+      setAddress(user.profile.address ?? "");
+      setDob(user.profile.dob ?? "");
+      setShopSlug(user.profile.shop_slug ?? "");
+    }
+  }, [user]);
+
   // Image cropping states
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperImageSrc, setCropperImageSrc] = useState("");
@@ -144,13 +158,7 @@ export default function ProfilePage() {
   };
 
 
-  if (!token || !user) {
-    return (
-      <PageShell title="Hồ sơ">
-        <div className="panel"><p className="muted">Vui lòng đăng nhập để xem hồ sơ.</p></div>
-      </PageShell>
-    );
-  }
+
   // Livestream states
   const [liveRoom, setLiveRoom] = useState<any>(null);
   const [isLiveEnabled, setIsLiveEnabled] = useState(false);
@@ -232,6 +240,14 @@ export default function ProfilePage() {
     }
   };
 
+  if (!token || !user) {
+    return (
+      <PageShell title="Hồ sơ">
+        <div className="panel"><p className="muted">Vui lòng đăng nhập để xem hồ sơ.</p></div>
+      </PageShell>
+    );
+  }
+
   const initials = getInitials(user.profile?.full_name, user.email[0].toUpperCase());
   const activeListings = myListings.filter((l) => l.status === "AVAILABLE");
   const soldListings = myListings.filter((l) => l.status === "SOLD");
@@ -284,7 +300,19 @@ export default function ProfilePage() {
               background: "var(--accent)", color: "var(--text-inverse)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 28, fontWeight: 700,
-            }}>{initials}</div>
+              overflow: "hidden",
+              border: "2px solid var(--border)"
+            }}>
+              {avatarUrl ? (
+                <img 
+                  src={getMediaUrl(avatarUrl)} 
+                  alt="Avatar" 
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                />
+              ) : (
+                initials
+              )}
+            </div>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontWeight: 700, fontSize: 18 }}>{user.profile?.full_name ?? user.email}</div>
               <div className="muted">{user.email}</div>
@@ -453,28 +481,7 @@ export default function ProfilePage() {
               </div>
             </div>
             
-            <div className="field">
-              <label>Ảnh bìa Shop (Banner)</label>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                {bannerUrl && (
-                  <img
-                    src={getMediaUrl(bannerUrl)}
-                    alt="Banner Preview"
-                    style={{ width: 80, height: 40, borderRadius: "var(--radius-sm)", objectFit: "cover", border: "1px solid var(--border)" }}
-                  />
-                )}
-                <label className="button secondary sm" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <Upload size={14} />
-                  Chọn và cắt ảnh
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, "banner")}
-                    style={{ display: "none" }}
-                  />
-                </label>
-              </div>
-            </div>
+
             <div className="field">
               <label htmlFor="bio">Giới thiệu bản thân</label>
               <textarea id="bio" placeholder="Viết vài dòng về bạn..." value={bio} onChange={(e) => setBio(e.target.value)} />

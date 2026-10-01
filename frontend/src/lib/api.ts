@@ -186,6 +186,10 @@ export const api = {
     request<{ count: number }>("/notifications/unread-count", undefined, token),
   unreadCountMessages: (token: string) =>
     request<{ count: number }>("/chat/unread-count", undefined, token),
+  unreadCountTransactions: (token: string) =>
+    request<{ count: number }>("/transactions/unread-count", undefined, token),
+  unreadCountModeration: (token: string) =>
+    request<{ count: number }>("/moderation/pending-count", undefined, token),
   readNotification: (token: string, notificationId: string) =>
     request<any>(`/notifications/${notificationId}/read`, { method: "PATCH" }, token),
   readAllNotifications: (token: string) =>

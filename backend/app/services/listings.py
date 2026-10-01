@@ -106,6 +106,26 @@ def create_listing(session: Session, owner: User, payload: ListingCreate) -> Lis
         target_id=str(listing.id),
         details={"ai_suggested_category": ai_suggested} if ai_suggested else {}
     )
+
+    # Notify followers of the listing owner
+    if listing.status == ListingStatus.AVAILABLE:
+        try:
+            from app.models.social import UserFollow
+            stmt_followers = select(UserFollow.follower_id).where(UserFollow.following_id == owner.id)
+            follower_ids = list(session.scalars(stmt_followers).all())
+            for fid in follower_ids:
+                create_notification(
+                    session,
+                    recipient_id=str(fid),
+                    type=NotificationType.SYSTEM,
+                    title="Bài đăng mới",
+                    message=f"Người bạn theo dõi ({owner.profile.full_name or owner.email}) vừa đăng sản phẩm mới: '{listing.title}'",
+                    link=f"/listings/{listing.id}"
+                )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to create follower notifications: %s", e)
+
     session.commit()
     return get_listing_or_error(session, listing.id)
 
@@ -316,6 +336,7 @@ def restore_listing(session: Session, actor: User, listing_id) -> Listing:
         select(Listing)
         .options(selectinload(Listing.owner).selectinload(User.profile), selectinload(Listing.category))
         .where(Listing.id == listing_id)
+        .execution_options(include_deleted=True)
     )
     listing = session.scalar(stmt)
     if not listing:

@@ -179,29 +179,29 @@ export function LocationPicker({ value, onChange, zoom = 13 }: LocationPickerPro
           {locating ? "⏳ Đang định vị..." : "🎯 Định vị tự động (GPS/IP)"}
         </button>
 
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          <span style={{ fontSize: 12, color: "var(--text-secondary)", marginRight: 4 }}>Chọn nhanh:</span>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <span style={{ fontSize: 13, fontWeight: "600", color: "var(--text)", marginRight: 6 }}>Chọn nhanh:</span>
           <button
             type="button"
-            className="button ghost sm"
+            className="button secondary sm"
             onClick={() => void handleSelectMockLocation("Đà Nẵng", 16.0544, 108.2022)}
-            style={{ fontSize: 12, padding: "4px 8px", background: "var(--bg-inset)" }}
+            style={{ fontSize: 12, padding: "4px 10px" }}
           >
             Đà Nẵng
           </button>
           <button
             type="button"
-            className="button ghost sm"
+            className="button secondary sm"
             onClick={() => void handleSelectMockLocation("Hà Nội", 21.0285, 105.8542)}
-            style={{ fontSize: 12, padding: "4px 8px", background: "var(--bg-inset)" }}
+            style={{ fontSize: 12, padding: "4px 10px" }}
           >
             Hà Nội
           </button>
           <button
             type="button"
-            className="button ghost sm"
+            className="button secondary sm"
             onClick={() => void handleSelectMockLocation("TP. HCM", 10.776, 106.701)}
-            style={{ fontSize: 12, padding: "4px 8px", background: "var(--bg-inset)" }}
+            style={{ fontSize: 12, padding: "4px 10px" }}
           >
             TP. HCM
           </button>
@@ -228,7 +228,7 @@ export function LocationPicker({ value, onChange, zoom = 13 }: LocationPickerPro
 
       {value?.address && (
         <div style={{ 
-          padding: "10px 14px", 
+          padding: "12px 16px", 
           background: "var(--bg-inset)", 
           borderRadius: "var(--radius)", 
           fontSize: 13, 
@@ -236,7 +236,7 @@ export function LocationPicker({ value, onChange, zoom = 13 }: LocationPickerPro
           color: "var(--text)",
           lineHeight: 1.4
         }}>
-          📍 <strong>Địa chỉ đã chọn:</strong> {value.address}
+          📍 <strong style={{ color: "var(--accent)" }}>Địa chỉ đã chọn:</strong> {value.address}
         </div>
       )}
       

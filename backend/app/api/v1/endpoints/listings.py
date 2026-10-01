@@ -114,6 +114,7 @@ def get_deleted_listings(
         .where(Listing.owner_id == current_user.id)
         .where(Listing.deleted_at.is_not(None))
         .order_by(Listing.deleted_at.desc())
+        .execution_options(include_deleted=True)
     )
     return list(session.scalars(stmt).unique())
 

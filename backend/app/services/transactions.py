@@ -47,6 +47,19 @@ def create_offer(session: Session, buyer: User, payload: OfferCreate) -> Offer:
     session.add(offer)
     session.commit()
     session.refresh(offer)
+
+    # Notify seller of the listing
+    from app.services.notification import create_notification
+    from app.models.enums import NotificationType
+    create_notification(
+        session,
+        recipient_id=str(listing.owner_id),
+        type=NotificationType.OFFER_RECEIVED,
+        title="Đề xuất mua hàng mới",
+        message=f"Bạn nhận được đề xuất mua '{listing.title}' mới với giá {payload.price}đ.",
+        link="/dashboard/offers"
+    )
+
     return offer
 
 def counter_offer(session: Session, actor: User, parent_offer_id, payload: CounterOfferCreate) -> Offer:
@@ -85,10 +98,14 @@ def _expire_offers_if_needed(session: Session, offers: list[Offer]):
     now = datetime.now(UTC)
     expired_any = False
     for o in offers:
-        if o.status == OfferStatus.PENDING and o.expires_at and o.expires_at < now:
-            o.status = OfferStatus.EXPIRED
-            session.add(o)
-            expired_any = True
+        if o.status == OfferStatus.PENDING and o.expires_at:
+            expires_at = o.expires_at
+            # Handle naive vs aware datetime comparison safely
+            now_to_compare = now.replace(tzinfo=None) if expires_at.tzinfo is None else now
+            if expires_at < now_to_compare:
+                o.status = OfferStatus.EXPIRED
+                session.add(o)
+                expired_any = True
     if expired_any:
         session.commit()
 
@@ -252,6 +269,31 @@ def update_delivery_status(session: Session, actor: User, deal_id: str, payload:
     session.add(deal)
     session.commit()
     session.refresh(deal)
+
+    # Notify buyer of delivery status update
+    try:
+        from app.services.notification import create_notification
+        from app.models.enums import NotificationType
+        status_map = {
+            "PENDING": "chờ xử lý",
+            "SHIPPING": "đang vận chuyển",
+            "DELIVERED": "đã giao hàng"
+        }
+        status_val = payload.delivery_status.value if hasattr(payload.delivery_status, "value") else str(payload.delivery_status)
+        status_str = status_map.get(status_val, status_val)
+        
+        create_notification(
+            session,
+            recipient_id=str(deal.buyer_id),
+            type=NotificationType.SYSTEM,
+            title="Cập nhật trạng thái giao hàng",
+            message=f"Đơn hàng '{deal.listing.title}' đã chuyển sang trạng thái: {status_str}.",
+            link="/dashboard/offers"
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to create delivery notification: %s", e)
+
     return deal
 
 from app.services.notification import create_notification
@@ -290,6 +332,19 @@ def file_dispute(session: Session, actor: User, deal_id: str, payload: DealDispu
         target_id=str(deal.id),
         details={"reason": payload.reason}
     )
+
+    # Broadcast moderation update
+    try:
+        import asyncio
+        from app.api.v1.endpoints.chat import manager
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(manager.broadcast({"type": "moderation_update"}))
+        except RuntimeError:
+            asyncio.run(manager.broadcast({"type": "moderation_update"}))
+    except Exception:
+        pass
+
     return deal
 
 def schedule_meetup(session: Session, actor: User, payload: MeetupCreate) -> Meetup:

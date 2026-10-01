@@ -116,6 +116,23 @@ def create_review(
     session.add(review)
     session.commit()
     session.refresh(review)
+
+    # Notify reviewed user
+    try:
+        from app.services.notification import create_notification
+        from app.models.enums import NotificationType
+        create_notification(
+            session,
+            recipient_id=str(user_id),
+            type=NotificationType.SYSTEM,
+            title="Đánh giá mới từ đối tác",
+            message=f"Bạn vừa nhận được đánh giá {payload.rating} sao từ đối tác giao dịch.",
+            link=f"/users/{user_id}"
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to create review notification: %s", e)
+
     return session.scalar(select(Review).options(selectinload(Review.reviewer).selectinload(User.profile)).where(Review.id == review.id))
 
 @router.get("/users/{user_id}/reviews", response_model=list[ReviewRead])
@@ -258,6 +275,23 @@ def ask_question(
     session.add(question)
     session.commit()
     session.refresh(question)
+
+    # Notify listing owner
+    try:
+        from app.services.notification import create_notification
+        from app.models.enums import NotificationType
+        create_notification(
+            session,
+            recipient_id=str(listing.owner_id),
+            type=NotificationType.SYSTEM,
+            title="Câu hỏi mới về tin đăng",
+            message=f"Người dùng vừa hỏi về '{listing.title}': {payload.question}",
+            link=f"/listings/{listing.id}"
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to create question notification: %s", e)
+
     return session.scalar(select(ListingQuestion).options(selectinload(ListingQuestion.asker).selectinload(User.profile)).where(ListingQuestion.id == question.id))
 
 @router.post("/listings/questions/{question_id}/answer", response_model=QuestionRead)
@@ -279,6 +313,24 @@ def answer_question(
     question.touch()
     session.commit()
     session.refresh(question)
+
+    # Notify asker
+    if question.asker_id:
+        try:
+            from app.services.notification import create_notification
+            from app.models.enums import NotificationType
+            create_notification(
+                session,
+                recipient_id=str(question.asker_id),
+                type=NotificationType.SYSTEM,
+                title="Câu hỏi của bạn đã được trả lời",
+                message=f"Người bán đã trả lời câu hỏi của bạn về '{listing.title}': {payload.answer}",
+                link=f"/listings/{listing.id}"
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Failed to create answer notification: %s", e)
+
     return session.scalar(select(ListingQuestion).options(selectinload(ListingQuestion.asker).selectinload(User.profile)).where(ListingQuestion.id == question.id))
 
 @router.get("/listings/{listing_id}/questions", response_model=list[QuestionRead])

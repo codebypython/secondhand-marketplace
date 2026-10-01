@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
-import { getInitials } from "@/lib/utils";
+import { getInitials, getMediaUrl } from "@/lib/utils";
 
 export default function LivestreamDirectoryPage() {
   const [rooms, setRooms] = useState<any[]>([]);
@@ -132,7 +132,7 @@ export default function LivestreamDirectoryPage() {
                     <div className="livestream-streamer-info">
                       <div className="livestream-streamer-avatar" style={{ overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--accent)", color: "white", fontWeight: "bold" }}>
                         {room.user?.profile?.avatar_url ? (
-                          <img src={room.user.profile.avatar_url} alt={streamerName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          <img src={getMediaUrl(room.user.profile.avatar_url)} alt={streamerName} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         ) : initials}
                       </div>
                       <span className="livestream-streamer-name">

@@ -319,66 +319,7 @@ export default function NewListingPage() {
             <button type="button" className="button ghost sm" onClick={addImageUrl}>
               ＋ Thêm ảnh
             </button>
-            <button
-              type="button"
-              className="button secondary sm"
-              onClick={handleAiCheck}
-              disabled={aiChecking || !imageUrls[0]?.trim()}
-              style={{ display: "flex", alignItems: "center", gap: 6 }}
-            >
-              <Sparkles size={16} />
-              {aiChecking ? "Đang phân tích..." : "Phân tích ảnh bằng AI"}
-            </button>
           </div>
-
-          {aiResult && (
-            <div
-              className="panel"
-              style={{
-                marginTop: 12,
-                padding: 12,
-                borderRadius: "8px",
-                border: aiResult.is_prohibited ? "1px solid var(--danger)" : "1px solid rgba(99, 102, 241, 0.2)",
-                backgroundColor: aiResult.is_prohibited ? "rgba(239, 68, 68, 0.05)" : "rgba(99, 102, 241, 0.03)",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <Sparkles size={16} style={{ color: aiResult.is_prohibited ? "var(--danger)" : "var(--primary)" }} />
-                <strong style={{ fontSize: 13, color: aiResult.is_prohibited ? "var(--danger)" : "var(--text)" }}>
-                  Kết quả phân tích AI
-                </strong>
-                {aiResult.mock && (
-                  <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, backgroundColor: "var(--border)", color: "var(--text-muted)" }}>
-                    Mô phỏng
-                  </span>
-                )}
-              </div>
-              {aiResult.is_prohibited ? (
-                <div style={{ fontSize: 12, color: "var(--danger)" }}>
-                  <strong>CẢNH BÁO VI PHẠM:</strong> {aiResult.prohibited_reason}
-                  <p style={{ margin: "4px 0 0 0", fontSize: 11, color: "var(--text-muted)" }}>
-                    Lưu ý: Tin đăng của bạn sẽ tự động bị ẩn sau khi tạo nếu bạn tiếp tục sử dụng ảnh này.
-                  </p>
-                </div>
-              ) : (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-                  <div style={{ fontSize: 12, color: "var(--text-secondary)" }}>
-                    Gợi ý danh mục: <strong>{aiResult.category_name}</strong> ({(aiResult.confidence * 100).toFixed(0)}% tin cậy)
-                  </div>
-                  {aiResult.category_slug && (
-                    <button
-                      type="button"
-                      className="button primary sm"
-                      onClick={applyAiCategory}
-                      style={{ padding: "4px 8px", fontSize: 11 }}
-                    >
-                      Áp dụng danh mục
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="field">

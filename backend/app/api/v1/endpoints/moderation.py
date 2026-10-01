@@ -95,6 +95,26 @@ def unblock_user_endpoint(
 
 
 
+@router.get("/pending-count")
+def get_pending_moderation_count(
+    session: Session = Depends(get_db_session),
+    admin: User = Depends(get_admin_user)
+) -> Any:
+    from app.models.moderation import Report
+    from app.models.transaction import Deal
+    from app.models.enums import ReportStatus
+    from sqlalchemy import select, func
+
+    pending_reports = session.scalar(
+        select(func.count(Report.id)).where(Report.status == ReportStatus.PENDING)
+    ) or 0
+    active_disputes = session.scalar(
+        select(func.count(Deal.id)).where(Deal.has_dispute == True)
+    ) or 0
+
+    return {"count": pending_reports + active_disputes}
+
+
 @router.get("/disputes", response_model=list[DealRead])
 def list_disputes_endpoint(
     session: Session = Depends(get_db_session),

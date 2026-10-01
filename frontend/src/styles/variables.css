@@ -27,9 +27,9 @@
   --text-tertiary: #8a92b0;
   
   /* Glassmorphic & Premium Design Tokens */
-  --glass-bg: rgba(23, 24, 38, 0.65);
-  --glass-border: rgba(103, 111, 157, 0.25);
-  --glass-border-hover: rgba(249, 177, 122, 0.35);
+  --glass-bg: var(--card-bg);
+  --glass-border: var(--border);
+  --glass-border-hover: var(--border-hover);
   --glow-accent: rgba(249, 177, 122, 0.15);
   --glow-accent-hover: rgba(249, 177, 122, 0.3);
   --accent-surface: rgba(249, 177, 122, 0.12);

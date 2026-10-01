@@ -107,12 +107,19 @@ export default function OffersDashboardPage() {
   useEffect(() => {
     if (!token) return;
     let active = true;
-    void Promise.all([api.myOffers(token), api.receivedOffers(token), api.listDeals(token)]).then(
-      ([mine, received, nextDeals]) => {
+    Promise.all([api.myOffers(token), api.receivedOffers(token), api.listDeals(token)])
+      .then(([mine, received, nextDeals]) => {
         if (!active) return;
-        setMyOffers(mine); setReceivedOffers(received); setDeals(nextDeals); setLoading(false);
-      },
-    );
+        setMyOffers(mine);
+        setReceivedOffers(received);
+        setDeals(nextDeals);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        showToast(err instanceof Error ? err.message : "Tải danh sách giao dịch thất bại.", "danger");
+        setLoading(false);
+      });
     return () => { active = false; };
   }, [token]);
 
@@ -412,7 +419,7 @@ export default function OffersDashboardPage() {
                           </div>
                           <div className="field">
                             <label style={{ fontSize: 12 }}>Địa điểm</label>
-                            <div style={{ background: "#fff", borderRadius: 8, overflow: "hidden" }}>
+                            <div style={{ background: "var(--bg-card)", borderRadius: 8, overflow: "hidden", border: "1.5px solid var(--border)" }}>
                               <LocationPicker 
                                 value={meetupLocation || null}
                                 onChange={(loc) => setMeetupLocation(loc as any)} 

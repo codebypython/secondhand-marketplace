@@ -21,3 +21,4 @@ frontend/.env
 *.db
 ngrok.exe
 ngrok/
+backend/scratch_*.py

@@ -8,6 +8,8 @@ import { Bell } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { SearchBox } from "@/components/search-box";
 import { api } from "@/lib/api";
+import { getMediaUrl, getWebSocketUrl } from "@/lib/utils";
+import { showToast } from "@/components/toast";
 
 export function NavBar() {
   const pathname = usePathname();
@@ -22,6 +24,8 @@ export function NavBar() {
   
   // Custom Avatar and Messages states
   const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+  const [unreadTransactionsCount, setUnreadTransactionsCount] = useState(0);
+  const [unreadModerationCount, setUnreadModerationCount] = useState(0);
   const [showAvatarDropdown, setShowAvatarDropdown] = useState(false);
 
   useEffect(() => {
@@ -45,26 +49,84 @@ export function NavBar() {
 
         const msgCountData = await api.unreadCountMessages(token);
         setUnreadMessagesCount(msgCountData.count);
+
+        const txCountData = await api.unreadCountTransactions(token);
+        setUnreadTransactionsCount(txCountData.count);
+
+        if (user?.role === "ADMIN") {
+          const modCountData = await api.unreadCountModeration(token);
+          setUnreadModerationCount(modCountData.count);
+        } else {
+          setUnreadModerationCount(0);
+        }
       } catch (e) {
-        console.error("Failed to fetch notifications/messages:", e);
+        console.error("Failed to fetch notifications/messages/transactions/moderation:", e);
       }
     };
 
     void fetchNotifications();
 
-    const runPoll = () => {
-      timerId = setTimeout(async () => {
-        await fetchNotifications();
-        runPoll();
-      }, 15000); // Poll every 15s
+    // Setup Global WebSocket connection for Real-Time notifications
+    let ws: WebSocket | null = null;
+    const wsUrl = getWebSocketUrl(token);
+
+    const connectWs = () => {
+      ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("Global WebSocket Connected successfully");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === "notification") {
+            void fetchNotifications();
+            showToast(`${data.title}: ${data.message}`, "success");
+          } else if (data.type === "chat_message") {
+            // Only show toast and increment if not currently on the inbox page to avoid double counting
+            if (window.location.pathname !== "/inbox") {
+              setUnreadMessagesCount((prev) => prev + 1);
+              showToast(`Tin nhắn mới: ${data.message.content}`, "success");
+            }
+          } else if (data.type === "messages_read") {
+            void fetchNotifications();
+          } else if (data.type === "moderation_update") {
+            void fetchNotifications();
+          }
+        } catch (e) {
+          console.error("Error parsing WS message:", e);
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("Global WebSocket Disconnected, reconnecting in 5s...");
+        timerId = setTimeout(() => {
+          connectWs();
+        }, 5000);
+      };
+
+      ws.onerror = (e) => {
+        console.error("Global WebSocket Error:", e);
+      };
     };
 
-    runPoll();
+    connectWs();
+
+    // Fallback polling to ensure state stays in sync
+    const pollInterval = setInterval(async () => {
+      await fetchNotifications();
+    }, 20000);
 
     return () => {
+      if (ws) {
+        ws.onclose = null; // Prevent reconnect loop
+        ws.close();
+      }
       clearTimeout(timerId);
+      clearInterval(pollInterval);
     };
-  }, [token]);
+  }, [token, user]);
 
   const handleNotificationClick = async (notif: any) => {
     setShowDropdown(false);
@@ -99,13 +161,21 @@ export function NavBar() {
     { href: "/", label: "Trang chủ" },
     { href: "/livestream", label: "Livestream" },
     { href: "/listings/new", label: "Đăng tin mới" },
-    { href: "/dashboard/offers", label: "Giao dịch" },
+    { 
+      href: "/dashboard/offers", 
+      label: unreadTransactionsCount > 0 ? `Giao dịch (${unreadTransactionsCount})` : "Giao dịch",
+      badge: unreadTransactionsCount > 0 
+    },
     { 
       href: "/inbox", 
       label: unreadMessagesCount > 0 ? `Tin nhắn (${unreadMessagesCount})` : "Tin nhắn",
       badge: unreadMessagesCount > 0
     },
-    ...(user?.role === "ADMIN" ? [{ href: "/moderation", label: "Kiểm duyệt" }] : []),
+    ...(user?.role === "ADMIN" ? [{ 
+      href: "/moderation", 
+      label: unreadModerationCount > 0 ? `Kiểm duyệt (${unreadModerationCount})` : "Kiểm duyệt",
+      badge: unreadModerationCount > 0 
+    }] : []),
     { href: "/profile", label: "Cá nhân" },
   ];
 
@@ -278,7 +348,17 @@ export function NavBar() {
                   gap: 8,
                 }}
               >
-                <div className="user-avatar" style={{ margin: 0 }}>{initials}</div>
+                <div className="user-avatar" style={{ margin: 0, padding: 0, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {user.profile?.avatar_url ? (
+                    <img 
+                      src={getMediaUrl(user.profile.avatar_url)} 
+                      alt="Avatar" 
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                    />
+                  ) : (
+                    initials
+                  )}
+                </div>
                 <span style={{ color: "var(--text)", fontWeight: 500, marginRight: 10 }}>{user.profile?.full_name ?? user.email}</span>
               </button>
 

@@ -4,6 +4,9 @@ const port = process.env.PORT || "3000";
 
 const nextConfig: NextConfig = {
   distDir: `.next_${port}`,
+  devIndicators: {
+    appIsrStatus: false,
+  },
   webpack: (config, { dev }) => {
     if (dev) {
       config.cache = false;
